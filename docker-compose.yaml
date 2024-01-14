@@ -1,0 +1,26 @@
+version: "3.9"
+services:
+  postgres:
+    container_name: postgres
+    image: postgres:16.1-alpine3.19
+    environment:
+      POSTGRES_DB: "metrics"
+      POSTGRES_USER: "mcollector"
+      POSTGRES_PASSWORD: "supersecretpassword"
+      PGDATA: "/var/lib/postgresql/data/pgdata"
+    volumes:
+      - ./pgDATA:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mcollector -d metrics"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
