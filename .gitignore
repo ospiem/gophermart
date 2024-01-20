@@ -6,7 +6,7 @@
 
 # Binaries
 cmd/gophermart/main
-cmd/gophermart/gophermart
+.tools/gophermart
 
 # Dependency directories (remove the comment below to include it)
 vendor/
@@ -19,3 +19,5 @@ golangci-lint/
 test.result
 pgDATA/
 .env
+.tools
+gophermart
