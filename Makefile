@@ -3,17 +3,17 @@
 export GOLANGCI_LINT_CACHE=${PWD}/golangci-lint/.cache
 export SHELL=/bin/zsh
 
-.PHONY: server
-server:
+.PHONY: build
+build:
 	@go build -o ./cmd/gophermart/gophermart ./cmd/gophermart/main.go
 
-.PHONY: run_server
-run_server:
-	@go run ./cmd/gophermart/main.go
+.PHONY: run
+run: build
+	@./cmd/gophermart/gophermart -d "postgres://gopher:supersecretpass@localhost:5432/gophermart?sslmode=disable"
 
 .PHONY: postgres
 postgres:
-	@docker compose up -d
+	@docker compose up -d postgres
 
 .PHONY: lint
 lint: _golangci-lint-rm-unformatted-report
