@@ -16,9 +16,9 @@ type storage interface {
 }
 
 type API struct {
-	cfg     config.Config
 	storage storage
 	log     zerolog.Logger
+	cfg     config.Config
 }
 
 func New(cfg config.Config, s storage, l zerolog.Logger) *API {

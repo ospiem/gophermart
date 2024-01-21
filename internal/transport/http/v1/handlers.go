@@ -54,7 +54,6 @@ func (a *API) uploadOrder(w http.ResponseWriter, r *http.Request) {
 		logger.Error().Err(err).Msg("cannot insert order to DB")
 		return
 	}
-
 }
 
 func (a *API) getOrders(w http.ResponseWriter, r *http.Request) {

@@ -5,8 +5,8 @@ import (
 )
 
 type Order struct {
-	Number     uint64
-	Status     status.Status
-	Accrual    uint64
 	UploadedAt string
+	Status     status.Status
+	Number     uint64
+	Accrual    uint64
 }

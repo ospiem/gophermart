@@ -1,15 +1,17 @@
 package v1
 
+const luhnAlgoDivisor = 10
+
 func isValidByLuhnAlgo(numbers []int) bool {
 	var sum int
 	isSecond := false
 	for _, d := range numbers {
 		if isSecond {
-			d = d * 2
+			d *= 2
 		}
-		sum += d / 10
-		sum += d % 10
+		sum += d / luhnAlgoDivisor
+		sum += d % luhnAlgoDivisor
 		isSecond = !isSecond
 	}
-	return sum%10 == 0
+	return sum%luhnAlgoDivisor == 0
 }

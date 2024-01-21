@@ -40,17 +40,18 @@ func run(logger zerolog.Logger) error {
 
 	wg := &sync.WaitGroup{}
 	defer func() {
+		// When exiting the main function, we expect the completion of application components
 		wg.Wait()
 	}()
 
 	cfg, err := config.New()
 	if err != nil {
-		logger.Fatal().Err(err).Msg("cannot initialize config")
+		return fmt.Errorf("cannot initialize config: %w", err)
 	}
 
 	db, err := postgres.NewDB(ctx, cfg.DSN)
 	if err != nil {
-		logger.Fatal().Err(err).Msg("cannot initialize PostgreSQL database")
+		return fmt.Errorf("cannot initialize PostgreSQL database: %w", err)
 	}
 
 	watchDB(ctx, wg, db, logger)
@@ -103,6 +104,5 @@ func manageServer(ctx context.Context, wg *sync.WaitGroup, srv *http.Server, err
 		if err := srv.Shutdown(shutDownTimeoutCtx); err != nil {
 			l.Error().Err(err).Msg("an error occurred during server shutdown")
 		}
-
 	}()
 }
