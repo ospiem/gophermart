@@ -1,7 +1,9 @@
 BEGIN;
 
-DROP TABLE gauges;
+DROP TABLE users;
 
-DROP TABLE counters;
+DROP TABLE orders;
+
+DROP TYPE status;
 
 COMMIT;

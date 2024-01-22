@@ -5,13 +5,18 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/ospiem/gophermart/internal/models"
+	"github.com/rs/zerolog"
 )
+
+const retryAttempts = 3
+const connPGError = "cannot connect to postgres, will retry in"
 
 type DB struct {
 	pool *pgxpool.Pool
@@ -73,10 +78,49 @@ func runMigrations(dsn string) error {
 	return nil
 }
 
-func (db *DB) InsertOrder(ctx context.Context, order models.Order) error {
+func (db *DB) InsertOrder(ctx context.Context, order models.Order, l zerolog.Logger) error {
+	logger := l.With().Str("DB method", "InsertOrder").Logger()
+	attempt := 0
+
+	for {
+		tag, err := db.pool.Exec(ctx,
+			`INSERT INTO orders (id, status) VALUES ($1, $2)
+				ON CONFLICT DO NOTHING`,
+			order.ID, order.Status,
+		)
+		if err != nil {
+			if !isConnExp(err) {
+				return fmt.Errorf("cannot insert order: %w", err)
+			}
+			var sleepTime time.Duration
+			if attempt < retryAttempts {
+				sleepTime += 500 * time.Millisecond
+				logger.Error().Err(err).Msgf("%s %v", connPGError, sleepTime)
+				attempt++
+				time.Sleep(sleepTime)
+			}
+		}
+		rowsAffectedCount := tag.RowsAffected()
+		if rowsAffectedCount != 1 {
+			return fmt.Errorf("insertOrder expected 1 row to be affected, actually affected %d", rowsAffectedCount)
+		}
+		break
+	}
+
 	return nil
 }
 
 func (db *DB) Close() {
 	db.pool.Close()
+}
+
+func (db *DB) SelectOrder(ctx context.Context, num uint64) (models.Order, error) {
+	order := models.Order{}
+	row := db.pool.QueryRow(ctx,
+		`SELECT id, status, created_at, COALESCE(accrual, 0) AS accrual FROM orders WHERE id = $1`,
+		num)
+	if err := row.Scan(&order.ID, &order.Status, &order.CreatedAt, &order.Accrual); err != nil {
+		return models.Order{}, fmt.Errorf("cannot select the order: %w", err)
+	}
+	return order, nil
 }

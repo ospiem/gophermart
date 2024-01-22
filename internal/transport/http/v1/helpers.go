@@ -1,5 +1,12 @@
 package v1
 
+import (
+	"context"
+	"errors"
+
+	"github.com/jackc/pgx/v5"
+)
+
 const luhnAlgoDivisor = 10
 
 func isValidByLuhnAlgo(numbers []int) bool {
@@ -14,4 +21,15 @@ func isValidByLuhnAlgo(numbers []int) bool {
 		isSecond = !isSecond
 	}
 	return sum%luhnAlgoDivisor == 0
+}
+
+func isOrderExists(ctx context.Context, s storage, num uint64) (bool, error) {
+	_, err := s.SelectOrder(ctx, num)
+	if err != nil {
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return false, err
+		}
+		return false, nil
+	}
+	return true, nil
 }

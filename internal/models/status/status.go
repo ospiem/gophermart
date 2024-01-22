@@ -1,10 +1,10 @@
 package status
 
-type Status uint8
+type Status string
 
 const (
-	NEW = iota
-	PROCESSING
-	INVALID
-	PROCESSED
+	NEW        = "NEW"
+	PROCESSING = "PROCESSING"
+	INVALID    = "INVALID"
+	PROCESSED  = "PROCESSED"
 )

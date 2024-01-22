@@ -4,7 +4,6 @@ import (
 	"io"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/ospiem/gophermart/internal/models"
 	"github.com/ospiem/gophermart/internal/models/status"
@@ -35,25 +34,36 @@ func (a *API) uploadOrder(w http.ResponseWriter, r *http.Request) {
 		logger.Error().Err(err).Msg("cannot read body")
 	}
 
-	on, err := strconv.ParseUint(string(body), 10, 64)
+	orderID, err := strconv.ParseUint(string(body), 10, 64)
 	if err != nil {
-		http.Error(w, "", http.StatusInternalServerError)
-		logger.Error().Err(err).Msg("cannot convert string to int")
+		http.Error(w, "", http.StatusUnprocessableEntity)
+		logger.Error().Err(err).Msg("cannot convert text to int")
 		return
 	}
 
 	order := models.Order{
-		Number:     on,
-		Status:     status.NEW,
-		Accrual:    0,
-		UploadedAt: time.Now().Format(time.RFC3339),
+		ID:     orderID,
+		Status: status.NEW,
 	}
 
-	if err = a.storage.InsertOrder(ctx, order); err != nil {
+	exists, err := isOrderExists(ctx, a.storage, orderID)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		logger.Error().Err(err).Msg("cannot check if order exists")
+		return
+	}
+	if exists {
+		w.WriteHeader(http.StatusOK)
+		logger.Debug().Msg("order already exists")
+		return
+	}
+
+	if err = a.storage.InsertOrder(ctx, order, a.log); err != nil {
 		http.Error(w, "", http.StatusInternalServerError)
 		logger.Error().Err(err).Msg("cannot insert order to DB")
 		return
 	}
+	w.WriteHeader(http.StatusAccepted)
 }
 
 func (a *API) getOrders(w http.ResponseWriter, r *http.Request) {

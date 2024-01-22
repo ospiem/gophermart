@@ -11,6 +11,10 @@ build:
 run: build
 	@./cmd/gophermart/gophermart -d "postgres://gopher:supersecretpass@localhost:5432/gophermart?sslmode=disable"
 
+.PHONY: debug
+debug: build
+	@./cmd/gophermart/gophermart -d "postgres://gopher:supersecretpass@localhost:5432/gophermart?sslmode=disable" -l debug
+
 .PHONY: postgres
 postgres:
 	@docker compose up -d postgres

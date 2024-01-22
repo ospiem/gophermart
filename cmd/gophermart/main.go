@@ -74,7 +74,7 @@ func run(logger zerolog.Logger) error {
 func watchDB(ctx context.Context, wg *sync.WaitGroup, db *postgres.DB, l zerolog.Logger) {
 	wg.Add(1)
 	go func() {
-		defer l.Info().Msg("DB is closed")
+		defer l.Info().Msg("DB has been closed")
 		defer wg.Done()
 
 		<-ctx.Done()
@@ -95,7 +95,7 @@ func manageServer(ctx context.Context, wg *sync.WaitGroup, srv *http.Server, err
 
 	wg.Add(1)
 	go func() {
-		defer l.Info().Msg("server has been shutdown")
+		defer l.Info().Msg("Server has been shutdown")
 		defer wg.Done()
 		<-ctx.Done()
 

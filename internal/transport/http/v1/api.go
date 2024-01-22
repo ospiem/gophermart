@@ -8,11 +8,13 @@ import (
 	"github.com/go-chi/chi/middleware"
 	"github.com/ospiem/gophermart/internal/config"
 	"github.com/ospiem/gophermart/internal/models"
+	"github.com/ospiem/gophermart/internal/tools"
 	"github.com/rs/zerolog"
 )
 
 type storage interface {
-	InsertOrder(ctx context.Context, order models.Order) error
+	InsertOrder(ctx context.Context, order models.Order, logger zerolog.Logger) error
+	SelectOrder(ctx context.Context, num uint64) (models.Order, error)
 }
 
 type API struct {
@@ -22,6 +24,7 @@ type API struct {
 }
 
 func New(cfg config.Config, s storage, l zerolog.Logger) *API {
+	tools.SetGlobalLogLevel(cfg.LogLevel)
 	return &API{
 		cfg:     cfg,
 		storage: s,
