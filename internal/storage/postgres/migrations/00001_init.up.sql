@@ -3,7 +3,9 @@ BEGIN;
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     login VARCHAR(200) UNIQUE NOT NULL,
-    hash_passwords VARCHAR(200) NOT NULL
+    hash_password VARCHAR(200) NOT NULL,
+    balance int,
+    withdrawn int
 );
 
 CREATE TYPE status AS ENUM ('NEW', 'PROCESSING', 'INVALID', 'PROCESSED');

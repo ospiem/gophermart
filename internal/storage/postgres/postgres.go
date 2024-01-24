@@ -143,3 +143,46 @@ func (db *DB) SelectOrders(ctx context.Context) ([]models.Order, error) {
 	}
 	return orders, nil
 }
+
+func (db *DB) SelectUser(ctx context.Context, login string) (models.User, error) {
+	user := models.User{}
+	row := db.pool.QueryRow(ctx,
+		`SELECT login, hash_password, COALESCE(balance, 0) as balance,
+			COALESCE(withdrawn, 0) as withdrawn from users where login = $1`, login)
+	if err := row.Scan(&user.Login, &user.Pass, &user.Balance, &user.Withdrawn); err != nil {
+		return models.User{}, fmt.Errorf("cannot select user: %w", err)
+	}
+	return user, nil
+}
+
+func (db *DB) InsertUser(ctx context.Context, login string, hash string, l zerolog.Logger) error {
+	logger := l.With().Str("func", "InsertUser").Logger()
+	attempt := 0
+
+	for {
+		tag, err := db.pool.Exec(ctx,
+			`INSERT INTO users (login, hash_password) VALUES ($1, $2)
+				ON CONFLICT DO NOTHING`,
+			login, hash,
+		)
+		if err != nil {
+			if !isConnExp(err) {
+				return fmt.Errorf("cannot insert order: %w", err)
+			}
+			var sleepTime time.Duration
+			if attempt < retryAttempts {
+				sleepTime += 500 * time.Millisecond
+				logger.Error().Err(err).Msgf("%s %v", connPGError, sleepTime)
+				attempt++
+				time.Sleep(sleepTime)
+			}
+		}
+		rowsAffectedCount := tag.RowsAffected()
+		if rowsAffectedCount != 1 {
+			return fmt.Errorf("insertUser expected 1 row to be affected, actually affected %d", rowsAffectedCount)
+		}
+		break
+	}
+
+	return nil
+}

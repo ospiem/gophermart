@@ -12,3 +12,10 @@ type Order struct {
 	ID        uint64
 	Accrual   uint64
 }
+
+type User struct {
+	Login     string `json:"login"`
+	Pass      string `json:"password"`
+	Balance   int64
+	Withdrawn uint64
+}
