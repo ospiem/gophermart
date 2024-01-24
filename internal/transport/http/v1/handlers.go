@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"strconv"
@@ -67,7 +68,30 @@ func (a *API) uploadOrder(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) getOrders(w http.ResponseWriter, r *http.Request) {
+	logger := a.log.With().Str("handler", "getOrders").Logger()
+	ctx := r.Context()
 
+	orders, err := a.storage.SelectOrders(ctx)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		logger.Error().Err(err).Msg("cannot get orders")
+		return
+	}
+
+	if len(orders) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		logger.Debug().Msg("user has no orders")
+		return
+	}
+
+	enc := json.NewEncoder(w)
+	if err := enc.Encode(orders); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		logger.Error().Err(err).Msg("cannot get orders")
+		return
+	}
+	w.Header().Add("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 }
 
 func (a *API) getWithdrawals(w http.ResponseWriter, r *http.Request) {

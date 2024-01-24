@@ -124,3 +124,22 @@ func (db *DB) SelectOrder(ctx context.Context, num uint64) (models.Order, error)
 	}
 	return order, nil
 }
+
+func (db *DB) SelectOrders(ctx context.Context) ([]models.Order, error) {
+	rows, err := db.pool.Query(ctx,
+		`SELECT id, status, created_at, COALESCE(accrual, 0) AS accrual
+			 FROM orders ORDER BY created_at DESC`)
+	if err != nil {
+		return nil, fmt.Errorf("postgres failed to get orders: %w", err)
+	}
+
+	orders := make([]models.Order, 0, rows.CommandTag().RowsAffected())
+	for rows.Next() {
+		order := models.Order{}
+		if err := rows.Scan(&order.ID, &order.Status, &order.CreatedAt, &order.Accrual); err != nil {
+			return nil, fmt.Errorf("cannot select the order: %w", err)
+		}
+		orders = append(orders, order)
+	}
+	return orders, nil
+}

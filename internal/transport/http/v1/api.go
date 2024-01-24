@@ -15,6 +15,7 @@ import (
 type storage interface {
 	InsertOrder(ctx context.Context, order models.Order, logger zerolog.Logger) error
 	SelectOrder(ctx context.Context, num uint64) (models.Order, error)
+	SelectOrders(ctx context.Context) ([]models.Order, error)
 }
 
 type API struct {
