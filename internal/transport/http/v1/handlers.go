@@ -52,11 +52,47 @@ func (a *API) registerUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	//TODO: implement JWT
+	w.Header().Set("Authorization", u.Login)
 	w.WriteHeader(http.StatusOK)
 }
 
-func (a *API) loginUser(w http.ResponseWriter, r *http.Request) {
+func (a *API) authUser(w http.ResponseWriter, r *http.Request) {
+	logger := a.log.With().Str("handler", "authUser").Logger()
 
+	if r.Header.Get("Content-Type") != "application/json" {
+		http.Error(w, "Invalid Content-Type, expected application/json", http.StatusBadRequest)
+		logger.Debug().Msg("invalid content-type")
+		return
+	}
+
+	ctx := r.Context()
+	u := models.User{}
+	dec := json.NewDecoder(r.Body)
+	if err := dec.Decode(&u); err != nil {
+		http.Error(w, "", http.StatusInternalServerError)
+		logger.Error().Err(err).Msg("cannot decode body")
+		return
+	}
+
+	exists, err := isUserExists(ctx, a.storage, u.Login)
+	if err != nil {
+		http.Error(w, "", http.StatusInternalServerError)
+		logger.Error().Err(err).Msg("cannot get user from db")
+		return
+	}
+	if !exists {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	if err := checkHash(ctx, a.storage, u.Login, u.Pass); err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	w.Header().Set("Authorization", u.Login)
+	w.WriteHeader(http.StatusOK)
 }
 
 func (a *API) uploadOrder(w http.ResponseWriter, r *http.Request) {

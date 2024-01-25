@@ -42,7 +42,7 @@ func (a *API) registerAPI() chi.Router {
 
 	r.Route("/api/user", func(r chi.Router) {
 		r.Post("/register", a.registerUser)
-		r.Post("/login", a.loginUser)
+		r.Post("/login", a.authUser)
 		r.Post("/orders", a.uploadOrder)
 		r.Get("/orders", a.getOrders)
 		r.Get("/withdrawals", a.getWithdrawals)

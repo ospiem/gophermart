@@ -54,3 +54,11 @@ func hashPass(pass string) (string, error) {
 	}
 	return string(hash), nil
 }
+
+func checkHash(ctx context.Context, s storage, login string, pass string) error {
+	user, err := s.SelectUser(ctx, login)
+	if err != nil {
+		return fmt.Errorf("cannot select user: %w", err)
+	}
+	return bcrypt.CompareHashAndPassword([]byte(user.Pass), []byte(pass))
+}
