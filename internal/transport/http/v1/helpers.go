@@ -6,10 +6,14 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/ospiem/gophermart/internal/models"
 	"golang.org/x/crypto/bcrypt"
 )
 
 const luhnAlgoDivisor = 10
+
+var OrderExists = errors.New("order exists")
+var OrderBelongsAnotherUser = errors.New("the order belongs to another user")
 
 func isValidByLuhnAlgo(numbers []int) bool {
 	var sum int
@@ -25,15 +29,20 @@ func isValidByLuhnAlgo(numbers []int) bool {
 	return sum%luhnAlgoDivisor == 0
 }
 
-func isOrderExists(ctx context.Context, s storage, num uint64) (bool, error) {
-	_, err := s.SelectOrder(ctx, num)
+func isOrderExists(ctx context.Context, s storage, newOrder models.Order) error {
+	selectOrder, err := s.SelectOrder(ctx, newOrder.ID)
 	if err != nil {
 		if !errors.Is(err, pgx.ErrNoRows) {
-			return false, err
+			return err
 		}
-		return false, nil
+		return nil
 	}
-	return true, nil
+	fmt.Printf("select: %s, new: %s", selectOrder.Username, newOrder.Username)
+	if selectOrder.Username == newOrder.Username {
+		return OrderExists
+	}
+
+	return OrderBelongsAnotherUser
 }
 
 func isUserExists(ctx context.Context, s storage, login string) (bool, error) {
@@ -55,7 +64,7 @@ func hashPass(pass string) (string, error) {
 	return string(hash), nil
 }
 
-func checkHash(ctx context.Context, s storage, login string, pass string) error {
+func compareHash(ctx context.Context, s storage, login string, pass string) error {
 	user, err := s.SelectUser(ctx, login)
 	if err != nil {
 		return fmt.Errorf("cannot select user: %w", err)

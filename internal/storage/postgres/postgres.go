@@ -84,9 +84,9 @@ func (db *DB) InsertOrder(ctx context.Context, order models.Order, l zerolog.Log
 
 	for {
 		tag, err := db.pool.Exec(ctx,
-			`INSERT INTO orders (id, status) VALUES ($1, $2)
+			`INSERT INTO orders (id, status, username) VALUES ($1, $2, $3)
 				ON CONFLICT DO NOTHING`,
-			order.ID, order.Status,
+			order.ID, order.Status, order.Username,
 		)
 		if err != nil {
 			if !isConnExp(err) {
@@ -117,18 +117,18 @@ func (db *DB) Close() {
 func (db *DB) SelectOrder(ctx context.Context, num uint64) (models.Order, error) {
 	order := models.Order{}
 	row := db.pool.QueryRow(ctx,
-		`SELECT id, status, created_at, COALESCE(accrual, 0) AS accrual FROM orders WHERE id = $1`,
+		`SELECT id, username, status, created_at, COALESCE(accrual, 0) AS accrual FROM orders WHERE id = $1`,
 		num)
-	if err := row.Scan(&order.ID, &order.Status, &order.CreatedAt, &order.Accrual); err != nil {
+	if err := row.Scan(&order.ID, &order.Username, &order.Status, &order.CreatedAt, &order.Accrual); err != nil {
 		return models.Order{}, fmt.Errorf("cannot select the order: %w", err)
 	}
 	return order, nil
 }
 
-func (db *DB) SelectOrders(ctx context.Context) ([]models.Order, error) {
+func (db *DB) SelectOrders(ctx context.Context, user string) ([]models.Order, error) {
 	rows, err := db.pool.Query(ctx,
 		`SELECT id, status, created_at, COALESCE(accrual, 0) AS accrual
-			 FROM orders ORDER BY created_at DESC`)
+			 FROM orders WHERE username = $1 ORDER BY created_at DESC`, user)
 	if err != nil {
 		return nil, fmt.Errorf("postgres failed to get orders: %w", err)
 	}

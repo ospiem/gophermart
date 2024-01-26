@@ -11,6 +11,7 @@ type Order struct {
 	Status    status.Status
 	ID        uint64
 	Accrual   uint64
+	Username  string
 }
 
 type User struct {

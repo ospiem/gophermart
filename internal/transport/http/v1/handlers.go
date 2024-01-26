@@ -2,6 +2,7 @@ package v1
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strconv"
@@ -23,8 +24,7 @@ func (a *API) registerUser(w http.ResponseWriter, r *http.Request) {
 	u := models.User{}
 	dec := json.NewDecoder(r.Body)
 	if err := dec.Decode(&u); err != nil {
-		http.Error(w, "", http.StatusInternalServerError)
-		logger.Error().Err(err).Msg("cannot decode body")
+		http.Error(w, "Invalid body", http.StatusBadRequest)
 		return
 	}
 
@@ -70,8 +70,7 @@ func (a *API) authUser(w http.ResponseWriter, r *http.Request) {
 	u := models.User{}
 	dec := json.NewDecoder(r.Body)
 	if err := dec.Decode(&u); err != nil {
-		http.Error(w, "", http.StatusInternalServerError)
-		logger.Error().Err(err).Msg("cannot decode body")
+		http.Error(w, "Invalid body", http.StatusBadRequest)
 		return
 	}
 
@@ -82,15 +81,16 @@ func (a *API) authUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !exists {
-		w.WriteHeader(http.StatusUnauthorized)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	if err := checkHash(ctx, a.storage, u.Login, u.Pass); err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
+	if err := compareHash(ctx, a.storage, u.Login, u.Pass); err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
+	//TODO: implement JWT
 	w.Header().Set("Authorization", u.Login)
 	w.WriteHeader(http.StatusOK)
 }
@@ -119,20 +119,26 @@ func (a *API) uploadOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	//TODO: implement jwt
+	user := r.Header.Get("Authorization")
 	order := models.Order{
-		ID:     orderID,
-		Status: status.NEW,
+		ID:       orderID,
+		Status:   status.NEW,
+		Username: user,
 	}
 
-	exists, err := isOrderExists(ctx, a.storage, orderID)
+	err = isOrderExists(ctx, a.storage, order)
 	if err != nil {
+		if errors.Is(err, OrderExists) {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		if errors.Is(err, OrderBelongsAnotherUser) {
+			w.WriteHeader(http.StatusConflict)
+			return
+		}
 		w.WriteHeader(http.StatusInternalServerError)
 		logger.Error().Err(err).Msg("cannot check if order exists")
-		return
-	}
-	if exists {
-		w.WriteHeader(http.StatusOK)
-		logger.Debug().Msg("order already exists")
 		return
 	}
 
@@ -148,7 +154,8 @@ func (a *API) getOrders(w http.ResponseWriter, r *http.Request) {
 	logger := a.log.With().Str("handler", "getOrders").Logger()
 	ctx := r.Context()
 
-	orders, err := a.storage.SelectOrders(ctx)
+	user := r.Header.Get("Authorization")
+	orders, err := a.storage.SelectOrders(ctx, user)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		logger.Error().Err(err).Msg("cannot get orders")
