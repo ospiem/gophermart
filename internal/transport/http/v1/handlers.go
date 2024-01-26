@@ -160,6 +160,7 @@ func (a *API) uploadOrder(w http.ResponseWriter, r *http.Request) {
 func (a *API) getOrders(w http.ResponseWriter, r *http.Request) {
 	logger := a.log.With().Str(handler, "getOrders").Logger()
 	ctx := r.Context()
+	w.Header().Set(contentType, applicationJSON)
 
 	user := r.Header.Get(authorization)
 	orders, err := a.storage.SelectOrders(ctx, user)
@@ -181,7 +182,6 @@ func (a *API) getOrders(w http.ResponseWriter, r *http.Request) {
 		logger.Error().Err(err).Msg("cannot get orders")
 		return
 	}
-	w.Header().Add(contentType, applicationJSON)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -190,7 +190,24 @@ func (a *API) getWithdrawals(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) getBalance(w http.ResponseWriter, r *http.Request) {
+	logger := a.log.With().Str(handler, "getBalance").Logger()
+	ctx := r.Context()
+	w.Header().Set(contentType, applicationJSON)
+	//TODO: implement JWT
+	username := r.Header.Get(authorization)
 
+	user, err := a.storage.SelectUser(ctx, username)
+	if err != nil {
+		http.Error(w, "", http.StatusInternalServerError)
+		logger.Error().Err(err).Msg("cannot get balance")
+		return
+	}
+	if err = marshalBalanceAndWithdrawn(user, w); err != nil {
+		http.Error(w, "", http.StatusInternalServerError)
+		logger.Error().Err(err).Msg("cannot get balance")
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 func (a *API) orderWithdraw(w http.ResponseWriter, r *http.Request) {

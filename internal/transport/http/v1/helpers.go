@@ -2,8 +2,10 @@ package v1
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/ospiem/gophermart/internal/models"
@@ -37,7 +39,6 @@ func isOrderExists(ctx context.Context, s storage, newOrder models.Order) error 
 		}
 		return nil
 	}
-	fmt.Printf("select: %s, new: %s", selectOrder.Username, newOrder.Username)
 	if selectOrder.Username == newOrder.Username {
 		return ErrOrderExists
 	}
@@ -67,10 +68,26 @@ func hashPass(pass string) (string, error) {
 func compareHash(ctx context.Context, s storage, login string, pass string) error {
 	user, err := s.SelectUser(ctx, login)
 	if err != nil {
-		return fmt.Errorf("cannot select user: %w", err)
+		return fmt.Errorf("cannot get user from db: %w", err)
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Pass), []byte(pass)); err != nil {
 		return fmt.Errorf("cannot compare passwords: %w", err)
 	}
+	return nil
+}
+
+func marshalBalanceAndWithdrawn(user models.User, w http.ResponseWriter) error {
+	enc := json.NewEncoder(w)
+
+	err := enc.Encode(struct {
+		Balance   int64  `json:"balance"`
+		Withdrawn uint64 `json:"withdrawn"`
+	}{
+		Balance:   user.Balance,
+		Withdrawn: user.Withdrawn})
+	if err != nil {
+		return fmt.Errorf("cannot marshal balance and withdrawn: %w", err)
+	}
+
 	return nil
 }
