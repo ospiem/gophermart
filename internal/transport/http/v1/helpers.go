@@ -80,8 +80,8 @@ func marshalBalanceAndWithdrawn(user models.User, w http.ResponseWriter) error {
 	enc := json.NewEncoder(w)
 
 	err := enc.Encode(struct {
-		Balance   int64  `json:"balance"`
-		Withdrawn uint64 `json:"withdrawn"`
+		Balance   float32 `json:"balance"`
+		Withdrawn float32 `json:"withdrawn"`
 	}{
 		Balance:   user.Balance,
 		Withdrawn: user.Withdrawn})

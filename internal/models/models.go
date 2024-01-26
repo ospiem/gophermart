@@ -11,12 +11,12 @@ type Order struct {
 	Status    status.Status
 	Username  string
 	ID        uint64
-	Accrual   uint64
+	Accrual   float32
 }
 
 type User struct {
 	Login     string `json:"login"`
 	Pass      string `json:"password"`
-	Balance   int64
-	Withdrawn uint64
+	Balance   float32
+	Withdrawn float32
 }
