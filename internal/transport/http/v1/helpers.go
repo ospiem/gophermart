@@ -12,8 +12,8 @@ import (
 
 const luhnAlgoDivisor = 10
 
-var OrderExists = errors.New("order exists")
-var OrderBelongsAnotherUser = errors.New("the order belongs to another user")
+var ErrOrderExists = errors.New("order exists")
+var ErrOrderBelongsAnotherUser = errors.New("the order belongs to another user")
 
 func isValidByLuhnAlgo(numbers []int) bool {
 	var sum int
@@ -33,23 +33,23 @@ func isOrderExists(ctx context.Context, s storage, newOrder models.Order) error 
 	selectOrder, err := s.SelectOrder(ctx, newOrder.ID)
 	if err != nil {
 		if !errors.Is(err, pgx.ErrNoRows) {
-			return err
+			return fmt.Errorf("cannot select the order: %w", err)
 		}
 		return nil
 	}
 	fmt.Printf("select: %s, new: %s", selectOrder.Username, newOrder.Username)
 	if selectOrder.Username == newOrder.Username {
-		return OrderExists
+		return ErrOrderExists
 	}
 
-	return OrderBelongsAnotherUser
+	return ErrOrderBelongsAnotherUser
 }
 
 func isUserExists(ctx context.Context, s storage, login string) (bool, error) {
 	_, err := s.SelectUser(ctx, login)
 	if err != nil {
 		if !errors.Is(err, pgx.ErrNoRows) {
-			return false, err
+			return false, fmt.Errorf("cannot select the user: %w", err)
 		}
 		return false, nil
 	}
@@ -69,5 +69,8 @@ func compareHash(ctx context.Context, s storage, login string, pass string) erro
 	if err != nil {
 		return fmt.Errorf("cannot select user: %w", err)
 	}
-	return bcrypt.CompareHashAndPassword([]byte(user.Pass), []byte(pass))
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Pass), []byte(pass)); err != nil {
+		return fmt.Errorf("cannot compare passwords: %w", err)
+	}
+	return nil
 }

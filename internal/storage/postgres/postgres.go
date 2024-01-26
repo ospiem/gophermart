@@ -17,6 +17,7 @@ import (
 
 const retryAttempts = 3
 const connPGError = "cannot connect to postgres, will retry in"
+const defaultSleepInterval = 500
 
 type DB struct {
 	pool *pgxpool.Pool
@@ -80,9 +81,8 @@ func runMigrations(dsn string) error {
 
 func (db *DB) InsertOrder(ctx context.Context, order models.Order, l zerolog.Logger) error {
 	logger := l.With().Str("DB method", "InsertOrder").Logger()
-	attempt := 0
 
-	for {
+	for attempt := 0; attempt < retryAttempts; attempt++ {
 		tag, err := db.pool.Exec(ctx,
 			`INSERT INTO orders (id, status, username) VALUES ($1, $2, $3)
 				ON CONFLICT DO NOTHING`,
@@ -93,12 +93,10 @@ func (db *DB) InsertOrder(ctx context.Context, order models.Order, l zerolog.Log
 				return fmt.Errorf("cannot insert order: %w", err)
 			}
 			var sleepTime time.Duration
-			if attempt < retryAttempts {
-				sleepTime += 500 * time.Millisecond
-				logger.Error().Err(err).Msgf("%s %v", connPGError, sleepTime)
-				attempt++
-				time.Sleep(sleepTime)
-			}
+			sleepTime += defaultSleepInterval * time.Millisecond
+			logger.Error().Err(err).Msgf("%s %v", connPGError, sleepTime)
+			time.Sleep(sleepTime)
+			continue
 		}
 		rowsAffectedCount := tag.RowsAffected()
 		if rowsAffectedCount != 1 {
@@ -106,7 +104,6 @@ func (db *DB) InsertOrder(ctx context.Context, order models.Order, l zerolog.Log
 		}
 		break
 	}
-
 	return nil
 }
 
@@ -157,9 +154,8 @@ func (db *DB) SelectUser(ctx context.Context, login string) (models.User, error)
 
 func (db *DB) InsertUser(ctx context.Context, login string, hash string, l zerolog.Logger) error {
 	logger := l.With().Str("func", "InsertUser").Logger()
-	attempt := 0
 
-	for {
+	for attempt := 0; attempt < retryAttempts; attempt++ {
 		tag, err := db.pool.Exec(ctx,
 			`INSERT INTO users (login, hash_password) VALUES ($1, $2)
 				ON CONFLICT DO NOTHING`,
@@ -170,12 +166,10 @@ func (db *DB) InsertUser(ctx context.Context, login string, hash string, l zerol
 				return fmt.Errorf("cannot insert order: %w", err)
 			}
 			var sleepTime time.Duration
-			if attempt < retryAttempts {
-				sleepTime += 500 * time.Millisecond
-				logger.Error().Err(err).Msgf("%s %v", connPGError, sleepTime)
-				attempt++
-				time.Sleep(sleepTime)
-			}
+			sleepTime += defaultSleepInterval * time.Millisecond
+			logger.Error().Err(err).Msgf("%s %v", connPGError, sleepTime)
+			time.Sleep(sleepTime)
+			continue
 		}
 		rowsAffectedCount := tag.RowsAffected()
 		if rowsAffectedCount != 1 {
@@ -183,6 +177,5 @@ func (db *DB) InsertUser(ctx context.Context, login string, hash string, l zerol
 		}
 		break
 	}
-
 	return nil
 }

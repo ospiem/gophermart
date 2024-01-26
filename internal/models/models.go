@@ -9,9 +9,9 @@ import (
 type Order struct {
 	CreatedAt time.Time
 	Status    status.Status
+	Username  string
 	ID        uint64
 	Accrual   uint64
-	Username  string
 }
 
 type User struct {

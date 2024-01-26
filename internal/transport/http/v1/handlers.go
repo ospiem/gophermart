@@ -11,12 +11,19 @@ import (
 	"github.com/ospiem/gophermart/internal/models/status"
 )
 
-func (a *API) registerUser(w http.ResponseWriter, r *http.Request) {
-	logger := a.log.With().Str("handler", "registerUser").Logger()
+const handler = "handler"
+const applicationJSON = "application/json"
+const invalidContentType = "invalid content-type"
+const cannotGetUser = "cannot get user from db"
+const authorization = "Authorization"
+const contentType = "Content-Type"
 
-	if r.Header.Get("Content-Type") != "application/json" {
+func (a *API) registerUser(w http.ResponseWriter, r *http.Request) {
+	logger := a.log.With().Str(handler, "registerUser").Logger()
+
+	if r.Header.Get(contentType) != applicationJSON {
 		http.Error(w, "Invalid Content-Type, expected application/json", http.StatusBadRequest)
-		logger.Debug().Msg("invalid content-type")
+		logger.Debug().Msg(invalidContentType)
 		return
 	}
 
@@ -31,7 +38,7 @@ func (a *API) registerUser(w http.ResponseWriter, r *http.Request) {
 	exists, err := isUserExists(ctx, a.storage, u.Login)
 	if err != nil {
 		http.Error(w, "", http.StatusInternalServerError)
-		logger.Error().Err(err).Msg("cannot get user from db")
+		logger.Error().Err(err).Msg("cannotGetUser")
 		return
 	}
 	if exists {
@@ -42,27 +49,27 @@ func (a *API) registerUser(w http.ResponseWriter, r *http.Request) {
 	hash, err := hashPass(u.Pass)
 	if err != nil {
 		http.Error(w, "", http.StatusInternalServerError)
-		logger.Error().Err(err).Msg("cannot get user from db")
+		logger.Error().Err(err).Msg(cannotGetUser)
 		return
 	}
 
 	if err := a.storage.InsertUser(ctx, u.Login, hash, a.log); err != nil {
 		http.Error(w, "", http.StatusInternalServerError)
-		logger.Error().Err(err).Msg("cannot get user from db")
+		logger.Error().Err(err).Msg(cannotGetUser)
 		return
 	}
 
 	//TODO: implement JWT
-	w.Header().Set("Authorization", u.Login)
+	w.Header().Set(authorization, u.Login)
 	w.WriteHeader(http.StatusOK)
 }
 
 func (a *API) authUser(w http.ResponseWriter, r *http.Request) {
-	logger := a.log.With().Str("handler", "authUser").Logger()
+	logger := a.log.With().Str(handler, "authUser").Logger()
 
-	if r.Header.Get("Content-Type") != "application/json" {
+	if r.Header.Get(contentType) != applicationJSON {
 		http.Error(w, "Invalid Content-Type, expected application/json", http.StatusBadRequest)
-		logger.Debug().Msg("invalid content-type")
+		logger.Debug().Msg(invalidContentType)
 		return
 	}
 
@@ -77,7 +84,7 @@ func (a *API) authUser(w http.ResponseWriter, r *http.Request) {
 	exists, err := isUserExists(ctx, a.storage, u.Login)
 	if err != nil {
 		http.Error(w, "", http.StatusInternalServerError)
-		logger.Error().Err(err).Msg("cannot get user from db")
+		logger.Error().Err(err).Msg(cannotGetUser)
 		return
 	}
 	if !exists {
@@ -91,16 +98,16 @@ func (a *API) authUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//TODO: implement JWT
-	w.Header().Set("Authorization", u.Login)
+	w.Header().Set(authorization, u.Login)
 	w.WriteHeader(http.StatusOK)
 }
 
 func (a *API) uploadOrder(w http.ResponseWriter, r *http.Request) {
-	logger := a.log.With().Str("handler", "uploadOrder").Logger()
+	logger := a.log.With().Str(handler, "uploadOrder").Logger()
 
-	if r.Header.Get("Content-Type") != "text/plain" {
+	if r.Header.Get(contentType) != "text/plain" {
 		http.Error(w, "Invalid Content-Type, expected text/plain", http.StatusBadRequest)
-		logger.Debug().Msg("invalid content-type")
+		logger.Debug().Msg(invalidContentType)
 		return
 	}
 
@@ -120,7 +127,7 @@ func (a *API) uploadOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//TODO: implement jwt
-	user := r.Header.Get("Authorization")
+	user := r.Header.Get(authorization)
 	order := models.Order{
 		ID:       orderID,
 		Status:   status.NEW,
@@ -129,11 +136,11 @@ func (a *API) uploadOrder(w http.ResponseWriter, r *http.Request) {
 
 	err = isOrderExists(ctx, a.storage, order)
 	if err != nil {
-		if errors.Is(err, OrderExists) {
+		if errors.Is(err, ErrOrderExists) {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
-		if errors.Is(err, OrderBelongsAnotherUser) {
+		if errors.Is(err, ErrOrderBelongsAnotherUser) {
 			w.WriteHeader(http.StatusConflict)
 			return
 		}
@@ -151,10 +158,10 @@ func (a *API) uploadOrder(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) getOrders(w http.ResponseWriter, r *http.Request) {
-	logger := a.log.With().Str("handler", "getOrders").Logger()
+	logger := a.log.With().Str(handler, "getOrders").Logger()
 	ctx := r.Context()
 
-	user := r.Header.Get("Authorization")
+	user := r.Header.Get(authorization)
 	orders, err := a.storage.SelectOrders(ctx, user)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -174,7 +181,7 @@ func (a *API) getOrders(w http.ResponseWriter, r *http.Request) {
 		logger.Error().Err(err).Msg("cannot get orders")
 		return
 	}
-	w.Header().Add("Content-Type", "application/json")
+	w.Header().Add(contentType, applicationJSON)
 	w.WriteHeader(http.StatusOK)
 }
 
