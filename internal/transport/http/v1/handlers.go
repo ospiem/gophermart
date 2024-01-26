@@ -182,7 +182,6 @@ func (a *API) getOrders(w http.ResponseWriter, r *http.Request) {
 		logger.Error().Err(err).Msg("cannot get orders")
 		return
 	}
-	w.WriteHeader(http.StatusOK)
 }
 
 func (a *API) getWithdrawals(w http.ResponseWriter, r *http.Request) {
@@ -207,7 +206,6 @@ func (a *API) getBalance(w http.ResponseWriter, r *http.Request) {
 		logger.Error().Err(err).Msg("cannot get balance")
 	}
 
-	w.WriteHeader(http.StatusOK)
 }
 
 func (a *API) orderWithdraw(w http.ResponseWriter, r *http.Request) {
