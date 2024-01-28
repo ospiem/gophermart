@@ -23,6 +23,9 @@ type DB struct {
 	pool *pgxpool.Pool
 }
 
+//go:embed migrations/*.sql
+var migrationsDir embed.FS
+
 func NewDB(ctx context.Context, dsn string) (*DB, error) {
 	if err := runMigrations(dsn); err != nil {
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
@@ -56,9 +59,6 @@ func initPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	return pool, nil
 }
 
-//go:embed migrations/*.sql
-var migrationsDir embed.FS
-
 func runMigrations(dsn string) error {
 	d, err := iofs.New(migrationsDir, "migrations")
 	if err != nil {
@@ -89,7 +89,7 @@ func (db *DB) InsertOrder(ctx context.Context, order models.Order, l zerolog.Log
 			order.ID, order.Status, order.Username,
 		)
 		if err != nil {
-			if !isConnExp(err) {
+			if !isConnException(err) {
 				return fmt.Errorf("cannot insert order: %w", err)
 			}
 			var sleepTime time.Duration
@@ -162,7 +162,7 @@ func (db *DB) InsertUser(ctx context.Context, login string, hash string, l zerol
 			login, hash,
 		)
 		if err != nil {
-			if !isConnExp(err) {
+			if !isConnException(err) {
 				return fmt.Errorf("cannot insert order: %w", err)
 			}
 			var sleepTime time.Duration

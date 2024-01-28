@@ -21,6 +21,10 @@ const invalidContentType = "invalid content-type"
 const cannotGetUser = "cannot get user from db"
 const authorization = "Authorization"
 const contentType = "Content-Type"
+const luhnAlgoDivisor = 10
+
+var ErrOrderBelongsAnotherUser = errors.New("the order belongs to another user")
+var ErrOrderExists = errors.New("order exists")
 
 func (a *API) registerUser(w http.ResponseWriter, r *http.Request) {
 	logger := a.log.With().Str(handler, "registerUser").Logger()
@@ -215,11 +219,6 @@ func (a *API) getBalance(w http.ResponseWriter, r *http.Request) {
 func (a *API) orderWithdraw(w http.ResponseWriter, r *http.Request) {
 
 }
-
-const luhnAlgoDivisor = 10
-
-var ErrOrderExists = errors.New("order exists")
-var ErrOrderBelongsAnotherUser = errors.New("the order belongs to another user")
 
 func isValidByLuhnAlgo(numbers []int) bool {
 	var sum int
