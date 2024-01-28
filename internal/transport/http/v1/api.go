@@ -9,6 +9,9 @@ import (
 	"github.com/ospiem/gophermart/internal/config"
 	"github.com/ospiem/gophermart/internal/models"
 	"github.com/ospiem/gophermart/internal/tools"
+	"github.com/ospiem/gophermart/internal/transport/http/v1/middleware/auth"
+	"github.com/ospiem/gophermart/internal/transport/http/v1/middleware/compress"
+	"github.com/ospiem/gophermart/internal/transport/http/v1/middleware/logger"
 	"github.com/rs/zerolog"
 )
 
@@ -39,17 +42,24 @@ func (a *API) registerAPI() chi.Router {
 	r := chi.NewRouter()
 
 	r.Use(middleware.Recoverer)
+	r.Use(compress.DecompressRequest(a.log))
+	r.Use(logger.RequestLogger(a.log))
+	r.Use(compress.CompressResponse(a.log))
 
 	r.Route("/api/user", func(r chi.Router) {
 		r.Post("/register", a.registerUser)
 		r.Post("/login", a.authUser)
-		r.Post("/orders", a.uploadOrder)
-		r.Get("/orders", a.getOrders)
-		r.Get("/withdrawals", a.getWithdrawals)
 
-		r.Route("/balance", func(r chi.Router) {
-			r.Get("/", a.getBalance)
-			r.Post("/withdraw", a.orderWithdraw)
+		r.Group(func(r chi.Router) {
+			r.Use(auth.JWTAuthorization(a.cfg.JWTSecretKey))
+			r.Post("/orders", a.insertOrder)
+			r.Get("/orders", a.getOrders)
+			r.Get("/withdrawals", a.getWithdrawals)
+
+			r.Route("/balance", func(r chi.Router) {
+				r.Get("/", a.getBalance)
+				r.Post("/withdraw", a.orderWithdraw)
+			})
 		})
 	})
 

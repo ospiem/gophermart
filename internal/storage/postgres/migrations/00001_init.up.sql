@@ -8,11 +8,10 @@ CREATE TABLE users (
     withdrawn REAL
 );
 
-CREATE TYPE status AS ENUM ('NEW', 'PROCESSING', 'INVALID', 'PROCESSED');
 
 CREATE TABLE orders (
     id bigint PRIMARY KEY UNIQUE,
-    status status NOT NULL ,
+    status VARCHAR(80) NOT NULL ,
     created_at TIMESTAMP  DEFAULT now(),
     accrual REAL,
     username VARCHAR(200),

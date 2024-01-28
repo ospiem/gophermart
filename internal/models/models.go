@@ -3,6 +3,7 @@ package models
 import (
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/ospiem/gophermart/internal/models/status"
 )
 
@@ -15,8 +16,17 @@ type Order struct {
 }
 
 type User struct {
-	Login     string `json:"login"`
-	Pass      string `json:"password"`
+	Credentials
 	Balance   float32
 	Withdrawn float32
+}
+
+type Credentials struct {
+	Login string `json:"login"`
+	Pass  string `json:"password"`
+}
+
+type Claims struct {
+	jwt.RegisteredClaims
+	Login string
 }
