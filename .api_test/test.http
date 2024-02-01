@@ -1,0 +1,50 @@
+### Register user1
+// @no-log
+POST {{host}}/api/user/register
+Content-Type: application/json
+
+{
+	"login": "user1",
+	"password": "qwerty"
+}
+> {%
+client.test("Request executed successfully", function() {
+  if(response.status === 200) {
+    client.global.set("token", response.headers.valueOf("Authorization"));
+  }
+});
+%}
+
+### Login user1
+// @no-log
+POST {{host}}/api/user/login
+Content-Type: application/json
+
+{
+  "login": "user1",
+  "password": "qwerty"
+}
+> {%
+client.test("Request executed successfully", function() {
+  if(response.status === 200) {
+    client.global.set("token", response.headers.valueOf("Authorization"));
+  }
+});
+%}
+
+### Insert good order
+// @no-log
+POST {{host}}/api/user/orders
+Content-Type: text/plain
+Authorization: {{token}}
+
+6282580316031144682
+
+### Insert bad order
+// @no-log
+POST {{host}}/api/user/orders
+Content-Type: text/plain
+Authorization: {{token}}
+
+35234533dsgd
+

@@ -41,15 +41,12 @@ func DecompressRequest(log zerolog.Logger) func(next http.Handler) http.Handler 
 
 			// If content type does not match with allowedContentTypes stop processing and return to next handler
 			if !matchContentTypes(r.Header.Values("Content-Type"), allowedContentTypes) {
-				log.Debug().Msgf("did not match Content-Type in DecompressRequest")
 				next.ServeHTTP(w, r)
 				return
 			}
-			log.Debug().Msgf("matched Content-Type in DecompressRequest")
 
 			// If compress function does not match with compressFunc stop processing and return to next handler
 			if !matchCompressFunc(r.Header.Values(contentEncoding), compressFunc) {
-				log.Debug().Msgf("did not match %s", contentEncoding)
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -75,11 +72,9 @@ func CompressResponse(log zerolog.Logger) func(next http.Handler) http.Handler {
 
 			// If client does not support compressed body stop processing and return to next handler
 			if !matchCompressFunc(r.Header.Values("Accept-Encoding"), compressFunc) {
-				log.Debug().Msg("did not match  Accept-Encoding")
 				next.ServeHTTP(w, r)
 				return
 			}
-			log.Debug().Msg("match Accept-Encoding")
 			gz, err := gzip.NewWriterLevel(w, gzip.BestCompression)
 			if err != nil {
 				log.Error().Err(err).Msg(wrapError)

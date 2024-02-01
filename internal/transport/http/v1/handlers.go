@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -26,10 +27,11 @@ const authorization = "Authorization"
 const contentType = "Content-Type"
 const luhnAlgoDivisor = 10
 const invalidBody = "Invalid body"
-const tokenExp = time.Hour * 6
+const tokenExp = time.Hour * 336
 
 var ErrOrderBelongsAnotherUser = errors.New("the order belongs to another user")
 var ErrOrderExists = errors.New("order exists")
+var ErrInsufficientPoints = errors.New("insufficient points ")
 
 func (a *API) registerUser(w http.ResponseWriter, r *http.Request) {
 	logger := a.log.With().Str(handler, "registerUser").Logger()
@@ -119,6 +121,7 @@ func (a *API) authUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set(authorization, token)
+	w.WriteHeader(http.StatusOK)
 }
 
 func (a *API) insertOrder(w http.ResponseWriter, r *http.Request) {
@@ -131,17 +134,15 @@ func (a *API) insertOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "", http.StatusInternalServerError)
 		logger.Error().Err(err).Msg("cannot read body")
 	}
-
-	orderID, err := strconv.ParseUint(string(body), 10, 64)
-	if err != nil {
-		http.Error(w, "", http.StatusUnprocessableEntity)
-		logger.Error().Err(err).Msg("cannot convert text to int")
+	orderID := string(body)
+	if err = isValidByLuhnAlgo(orderID); err != nil {
+		http.Error(w, "Invalid order number", http.StatusBadRequest)
+		logger.Debug().Err(err).Msg("")
 		return
 	}
 
@@ -156,7 +157,7 @@ func (a *API) insertOrder(w http.ResponseWriter, r *http.Request) {
 		Username: login,
 	}
 
-	err = isOrderExists(ctx, a.storage, order)
+	err = isOrderExists(ctx, a.storage, order.ID, order.Username)
 	if err != nil {
 		if errors.Is(err, ErrOrderExists) {
 			w.WriteHeader(http.StatusOK)
@@ -210,7 +211,68 @@ func (a *API) getOrders(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (a *API) orderWithdraw(w http.ResponseWriter, r *http.Request) {
+	logger := a.log.With().Str(handler, "orderWithdraw").Logger()
+	if r.Header.Get(contentType) != applicationJSON {
+		http.Error(w, "Invalid Content-Type, expected application/json", http.StatusBadRequest)
+		logger.Debug().Msg(invalidContentType)
+		return
+	}
+	ctx := r.Context()
+	w.Header().Set(contentType, applicationJSON)
+
+	login, ok := r.Context().Value(auth.ContextLoginKey).(string)
+	if !ok {
+		http.Error(w, "", http.StatusUnauthorized)
+		return
+	}
+
+	withdraw := models.Withdraw{}
+	dec := json.NewDecoder(r.Body)
+	if err := dec.Decode(&withdraw); err != nil {
+		http.Error(w, invalidBody, http.StatusBadRequest)
+		logger.Error().Err(err)
+		return
+	}
+	withdraw.User = login
+
+	if err := proceedWithdraw(ctx, a, withdraw); err != nil {
+		if errors.Is(err, ErrInsufficientPoints) {
+			http.Error(w, "Insufficient points", http.StatusPaymentRequired)
+			return
+		}
+		if errors.Is(pgx.ErrNoRows, err) {
+			http.Error(w, "Insufficient points", http.StatusUnprocessableEntity)
+			return
+		}
+		http.Error(w, "", http.StatusInternalServerError)
+		logger.Error().Err(err).Msg("cannot proceed withdraw")
+	}
+
+}
+
 func (a *API) getWithdrawals(w http.ResponseWriter, r *http.Request) {
+	logger := a.log.With().Str(handler, "getWithdrawals").Logger()
+	ctx := r.Context()
+	w.Header().Set(contentType, applicationJSON)
+
+	login, ok := r.Context().Value(auth.ContextLoginKey).(string)
+	if !ok {
+		http.Error(w, "", http.StatusUnauthorized)
+		return
+	}
+	withdraws, err := a.storage.SelectWithdraws(ctx, login)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		logger.Error().Err(err).Msg("cannot get withdraws")
+		return
+	}
+
+	enc := json.NewEncoder(w)
+	if err := enc.Encode(withdraws); err != nil {
+		http.Error(w, "", http.StatusInternalServerError)
+		logger.Error().Err(err).Msg("cannot marshal withdraws")
+	}
 
 }
 
@@ -236,10 +298,6 @@ func (a *API) getBalance(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (a *API) orderWithdraw(w http.ResponseWriter, r *http.Request) {
-
-}
-
 func buildJWTString(login string, key string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256,
 		models.Claims{
@@ -255,10 +313,22 @@ func buildJWTString(login string, key string) (string, error) {
 	return tokenString, nil
 }
 
-func isValidByLuhnAlgo(numbers []int) bool {
+func isValidByLuhnAlgo(orderNum string) error {
+	re := regexp.MustCompile(`^\d+$`)
+	if !re.MatchString(orderNum) {
+		return fmt.Errorf("order number contains non-digit characters: %s", orderNum)
+	}
+
 	var sum int
 	isSecond := false
-	for _, d := range numbers {
+
+	for _, char := range orderNum {
+
+		d, err := strconv.Atoi(string(char))
+		if err != nil {
+			return fmt.Errorf("cannot convert string to int: %w", err)
+		}
+
 		if isSecond {
 			d *= 2
 		}
@@ -266,18 +336,22 @@ func isValidByLuhnAlgo(numbers []int) bool {
 		sum += d % luhnAlgoDivisor
 		isSecond = !isSecond
 	}
-	return sum%luhnAlgoDivisor == 0
+
+	if !(sum%luhnAlgoDivisor == 0) {
+		return fmt.Errorf("the sum of the digits is not divisible by 10")
+	}
+	return nil
 }
 
-func isOrderExists(ctx context.Context, s storage, newOrder models.Order) error {
-	selectOrder, err := s.SelectOrder(ctx, newOrder.ID)
+func isOrderExists(ctx context.Context, s storage, newOrder string, newUser string) error {
+	selectOrder, err := s.SelectOrder(ctx, newOrder)
 	if err != nil {
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return fmt.Errorf("cannot select the order: %w", err)
 		}
 		return nil
 	}
-	if selectOrder.Username == newOrder.Username {
+	if selectOrder.Username == newUser {
 		return ErrOrderExists
 	}
 
@@ -312,5 +386,26 @@ func marshalBalanceAndWithdrawn(user models.User, w http.ResponseWriter) error {
 		return fmt.Errorf("cannot marshal balance and withdrawn: %w", err)
 	}
 
+	return nil
+}
+
+func proceedWithdraw(ctx context.Context, a *API, withdraw models.Withdraw) error {
+
+	_, err := a.storage.SelectOrder(ctx, withdraw.OrderNumber)
+	if err != nil {
+		return fmt.Errorf("cannot select order: %w", err)
+	}
+
+	u, err := a.storage.SelectUser(ctx, withdraw.User)
+	if err != nil {
+		return fmt.Errorf("cannot select user: %w", err)
+	}
+	if u.Balance < withdraw.Sum {
+		return ErrInsufficientPoints
+	}
+
+	if err := a.storage.InsertWithdraw(ctx, withdraw, a.log); err != nil {
+		return fmt.Errorf("cannot insert withdraw: %w", err)
+	}
 	return nil
 }

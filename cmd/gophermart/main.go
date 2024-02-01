@@ -54,12 +54,12 @@ func run(logger zerolog.Logger) error {
 		return fmt.Errorf("cannot initialize PostgreSQL database: %w", err)
 	}
 
-	watchDB(ctx, wg, db, logger)
+	watchDB(ctx, wg, db, &logger)
 
 	componentsErrs := make(chan error, 1)
-	a := api.New(cfg, db, logger)
+	a := api.New(&cfg, db, &logger)
 	srv := a.InitServer()
-	manageServer(ctx, wg, srv, componentsErrs, logger)
+	manageServer(ctx, wg, srv, componentsErrs, &logger)
 
 	select {
 	case <-ctx.Done():
@@ -71,7 +71,7 @@ func run(logger zerolog.Logger) error {
 	return nil
 }
 
-func watchDB(ctx context.Context, wg *sync.WaitGroup, db *postgres.DB, l zerolog.Logger) {
+func watchDB(ctx context.Context, wg *sync.WaitGroup, db *postgres.DB, l *zerolog.Logger) {
 	wg.Add(1)
 	go func() {
 		defer l.Info().Msg("DB has been closed")
@@ -83,7 +83,7 @@ func watchDB(ctx context.Context, wg *sync.WaitGroup, db *postgres.DB, l zerolog
 	}()
 }
 
-func manageServer(ctx context.Context, wg *sync.WaitGroup, srv *http.Server, errs chan error, l zerolog.Logger) {
+func manageServer(ctx context.Context, wg *sync.WaitGroup, srv *http.Server, errs chan error, l *zerolog.Logger) {
 	go func(errs chan<- error) {
 		if err := srv.ListenAndServe(); err != nil {
 			if errors.Is(err, http.ErrServerClosed) {

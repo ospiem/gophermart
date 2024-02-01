@@ -11,7 +11,7 @@ type Order struct {
 	CreatedAt time.Time
 	Status    status.Status
 	Username  string
-	ID        uint64
+	ID        string
 	Accrual   float32
 }
 
@@ -29,4 +29,16 @@ type Credentials struct {
 type Claims struct {
 	jwt.RegisteredClaims
 	Login string
+}
+
+type Withdraw struct {
+	OrderNumber string  `json:"order"`
+	Sum         float32 `json:"sum"`
+	User        string  `json:"-"`
+}
+
+type WithdrawResponse struct {
+	Order       string    `json:"order"`
+	Sum         float32   `json:"sum"`
+	ProcessedAt time.Time `json:"processed_at"`
 }

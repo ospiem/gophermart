@@ -111,7 +111,7 @@ func (db *DB) Close() {
 	db.pool.Close()
 }
 
-func (db *DB) SelectOrder(ctx context.Context, num uint64) (models.Order, error) {
+func (db *DB) SelectOrder(ctx context.Context, num string) (models.Order, error) {
 	order := models.Order{}
 	row := db.pool.QueryRow(ctx,
 		`SELECT id, username, status, created_at, COALESCE(accrual, 0) AS accrual FROM orders WHERE id = $1`,
@@ -122,14 +122,15 @@ func (db *DB) SelectOrder(ctx context.Context, num uint64) (models.Order, error)
 	return order, nil
 }
 
-func (db *DB) SelectOrders(ctx context.Context, user string) ([]models.Order, error) {
+func (db *DB) SelectOrders(ctx context.Context, login string) ([]models.Order, error) {
 	rows, err := db.pool.Query(ctx,
 		`SELECT id, status, created_at, COALESCE(accrual, 0) AS accrual
-			 FROM orders WHERE username = $1 ORDER BY created_at DESC`, user)
+			 FROM orders WHERE username = $1 ORDER BY created_at DESC`, login)
 	if err != nil {
 		return nil, fmt.Errorf("postgres failed to get orders: %w", err)
 	}
 
+	//TODO: paginate it
 	orders := make([]models.Order, 0, rows.CommandTag().RowsAffected())
 	for rows.Next() {
 		order := models.Order{}
@@ -144,9 +145,9 @@ func (db *DB) SelectOrders(ctx context.Context, user string) ([]models.Order, er
 func (db *DB) SelectUser(ctx context.Context, login string) (models.User, error) {
 	user := models.User{}
 	row := db.pool.QueryRow(ctx,
-		`SELECT login, hash_password, COALESCE(balance, 0) as balance,
-			COALESCE(withdrawn, 0) as withdrawn from users where login = $1`, login)
-	if err := row.Scan(&user.Login, &user.Pass, &user.Balance, &user.Withdrawn); err != nil {
+		`SELECT login, hash_password, COALESCE(balance, 0) as balance
+			from users where login = $1`, login)
+	if err := row.Scan(&user.Login, &user.Pass, &user.Balance); err != nil {
 		return models.User{}, fmt.Errorf("cannot select user: %w", err)
 	}
 	return user, nil
@@ -178,4 +179,70 @@ func (db *DB) InsertUser(ctx context.Context, login string, hash string, l zerol
 		break
 	}
 	return nil
+}
+
+func (db *DB) InsertWithdraw(ctx context.Context, w models.Withdraw, l zerolog.Logger) error {
+	logger := l.With().Str("func", "InsertWithdraw").Logger()
+	begin, err := db.pool.Begin(ctx)
+	defer begin.Rollback(ctx)
+
+	if err != nil {
+		return fmt.Errorf("cannot start a transaction: %w", err)
+	}
+	var wID string
+	row := begin.QueryRow(ctx,
+		`INSERT INTO withdraws (username, withdrawn, order_number) VALUES ($1, $2, $3)
+				RETURNING withdraws.id`,
+		w.User, w.Sum, w.OrderNumber,
+	)
+	if err := row.Scan(&wID); err != nil {
+		return fmt.Errorf("cannot insert withdraw: %w", err)
+	}
+
+	for attempt := 0; attempt < retryAttempts; attempt++ {
+		tag, err := begin.Exec(ctx,
+			`UPDATE users SET balance = users.balance - $1,
+                 withdraw = $2 WHERE login = $3;`,
+			w.Sum, wID, w.User,
+		)
+		if err != nil {
+			if !isConnException(err) {
+				return fmt.Errorf("cannot insert withdraw: %w", err)
+			}
+			var sleepTime time.Duration
+			sleepTime += defaultSleepInterval * time.Millisecond
+			logger.Error().Err(err).Msgf("%s %v", connPGError, sleepTime)
+			time.Sleep(sleepTime)
+			continue
+		}
+		rowsAffectedCount := tag.RowsAffected()
+		if rowsAffectedCount != 1 {
+			return fmt.Errorf("insertUser expected 1 row to be affected, actually affected %d", rowsAffectedCount)
+		}
+		break
+	}
+	if err := begin.Commit(ctx); err != nil {
+		return fmt.Errorf("cannot commit transaction: %w", err)
+	}
+	return nil
+}
+
+func (db *DB) SelectWithdraws(ctx context.Context, login string) ([]models.WithdrawResponse, error) {
+	rows, err := db.pool.Query(ctx,
+		`SELECT order_number, withdrawn,processed_at FROM withdraws where username = $1 
+   		ORDER BY processed_at`, login)
+
+	if err != nil {
+		return nil, fmt.Errorf("postgres failed to get withdrawls: %w", err)
+	}
+
+	withdrawls := make([]models.WithdrawResponse, 0, rows.CommandTag().RowsAffected())
+	for rows.Next() {
+		wr := models.WithdrawResponse{}
+		if err := rows.Scan(&wr.Order, &wr.Sum, &wr.ProcessedAt); err != nil {
+			return nil, fmt.Errorf("cannot select the withdrawl: %w", err)
+		}
+		withdrawls = append(withdrawls, wr)
+	}
+	return withdrawls, nil
 }

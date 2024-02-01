@@ -17,10 +17,12 @@ import (
 
 type storage interface {
 	InsertOrder(ctx context.Context, order models.Order, logger zerolog.Logger) error
-	SelectOrder(ctx context.Context, num uint64) (models.Order, error)
+	SelectOrder(ctx context.Context, num string) (models.Order, error)
 	SelectOrders(ctx context.Context, user string) ([]models.Order, error)
 	SelectUser(ctx context.Context, login string) (models.User, error)
 	InsertUser(ctx context.Context, login string, hash string, l zerolog.Logger) error
+	InsertWithdraw(ctx context.Context, withdraw models.Withdraw, l zerolog.Logger) error
+	SelectWithdraws(ctx context.Context, login string) ([]models.WithdrawResponse, error)
 }
 
 type API struct {
@@ -29,12 +31,12 @@ type API struct {
 	cfg     config.Config
 }
 
-func New(cfg config.Config, s storage, l zerolog.Logger) *API {
+func New(cfg *config.Config, s storage, l *zerolog.Logger) *API {
 	tools.SetGlobalLogLevel(cfg.LogLevel)
 	return &API{
-		cfg:     cfg,
+		cfg:     *cfg,
 		storage: s,
-		log:     l,
+		log:     *l,
 	}
 }
 
