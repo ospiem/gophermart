@@ -201,9 +201,30 @@ func (db *DB) InsertWithdraw(ctx context.Context, w models.Withdraw, l zerolog.L
 
 	for attempt := 0; attempt < retryAttempts; attempt++ {
 		tag, err := begin.Exec(ctx,
-			`UPDATE users SET balance = users.balance - $1,
-                 withdraw = $2 WHERE login = $3;`,
-			w.Sum, wID, w.User,
+			`UPDATE users SET balance = users.balance - $1 WHERE login = $2;`,
+			w.Sum, w.User,
+		)
+		if err != nil {
+			if !isConnException(err) {
+				return fmt.Errorf("cannot update balance: %w", err)
+			}
+			var sleepTime time.Duration
+			sleepTime += defaultSleepInterval * time.Millisecond
+			logger.Error().Err(err).Msgf("%s %v", connPGError, sleepTime)
+			time.Sleep(sleepTime)
+			continue
+		}
+		rowsAffectedCount := tag.RowsAffected()
+		if rowsAffectedCount != 1 {
+			return fmt.Errorf("update balance expected 1 row to be affected, actually affected %d", rowsAffectedCount)
+		}
+		break
+	}
+
+	for attempt := 0; attempt < retryAttempts; attempt++ {
+		tag, err := begin.Exec(ctx,
+			`UPDATE orders SET  withdraw = $1 WHERE id = $2;`,
+			wID, w.OrderNumber,
 		)
 		if err != nil {
 			if !isConnException(err) {
@@ -217,7 +238,7 @@ func (db *DB) InsertWithdraw(ctx context.Context, w models.Withdraw, l zerolog.L
 		}
 		rowsAffectedCount := tag.RowsAffected()
 		if rowsAffectedCount != 1 {
-			return fmt.Errorf("insertUser expected 1 row to be affected, actually affected %d", rowsAffectedCount)
+			return fmt.Errorf("insert withdraw expected 1 row to be affected, actually affected %d", rowsAffectedCount)
 		}
 		break
 	}

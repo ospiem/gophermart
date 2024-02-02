@@ -79,6 +79,7 @@ func (a *API) registerUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set(authorization, token)
+	w.WriteHeader(http.StatusOK)
 }
 
 func (a *API) authUser(w http.ResponseWriter, r *http.Request) {
@@ -157,7 +158,7 @@ func (a *API) insertOrder(w http.ResponseWriter, r *http.Request) {
 		Username: login,
 	}
 
-	err = isOrderExists(ctx, a.storage, order.ID, order.Username)
+	err = checkOrderExists(ctx, a.storage, order.ID, order.Username)
 	if err != nil {
 		if errors.Is(err, ErrOrderExists) {
 			w.WriteHeader(http.StatusOK)
@@ -177,6 +178,7 @@ func (a *API) insertOrder(w http.ResponseWriter, r *http.Request) {
 		logger.Error().Err(err).Msg("cannot insert order to DB")
 		return
 	}
+
 	w.WriteHeader(http.StatusAccepted)
 }
 
@@ -343,7 +345,7 @@ func isValidByLuhnAlgo(orderNum string) error {
 	return nil
 }
 
-func isOrderExists(ctx context.Context, s storage, newOrder string, newUser string) error {
+func checkOrderExists(ctx context.Context, s storage, newOrder string, newUser string) error {
 	selectOrder, err := s.SelectOrder(ctx, newOrder)
 	if err != nil {
 		if !errors.Is(err, pgx.ErrNoRows) {

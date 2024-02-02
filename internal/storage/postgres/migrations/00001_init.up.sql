@@ -5,7 +5,6 @@ CREATE TABLE users (
     login VARCHAR(200) UNIQUE NOT NULL,
     hash_password VARCHAR(200) NOT NULL,
     balance REAL,
-    withdraw UUID
 );
 
 
@@ -15,6 +14,7 @@ CREATE TABLE orders (
     created_at TIMESTAMP  DEFAULT now(),
     accrual REAL,
     username VARCHAR(200),
+    withdraw UUID,
     CONSTRAINT accrual_positive_check CHECK (accrual::numeric >= 0),
     FOREIGN KEY(username) REFERENCES users(login)
 );
@@ -32,7 +32,7 @@ CREATE TABLE withdraws (
 COMMIT;
 
 
-ALTER TABLE users ADD FOREIGN KEY (withdraw) REFERENCES withdraws(id);
+ALTER TABLE orders ADD FOREIGN KEY (withdraw) REFERENCES withdraws(id);
 
 INSERT INTO withdraws (username, withdrawn, order_number) VALUES ('user1', 500, 1212)
 RETURNING withdraws.id;
