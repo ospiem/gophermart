@@ -5,13 +5,13 @@ CREATE TABLE users (
     login VARCHAR(200) UNIQUE NOT NULL,
     hash_password VARCHAR(200) NOT NULL,
     balance REAL,
+    total_withdrawn REAL
 );
-
 
 CREATE TABLE orders (
     id VARCHAR(80) PRIMARY KEY UNIQUE,
-    status VARCHAR(80) NOT NULL ,
-    created_at TIMESTAMP  DEFAULT now(),
+    status VARCHAR(80) NOT NULL,
+    created_at TIMESTAMP DEFAULT now(),
     accrual REAL,
     username VARCHAR(200),
     withdraw UUID,
@@ -24,15 +24,11 @@ CREATE TABLE withdraws (
     username VARCHAR(200),
     withdrawn REAL,
     order_number VARCHAR(80),
-    processed_at TIMESTAMP  DEFAULT now(),
+    processed_at TIMESTAMP DEFAULT now(),
     FOREIGN KEY(username) REFERENCES users(login),
     FOREIGN KEY(order_number) REFERENCES orders(id)
 );
 
 COMMIT;
 
-
 ALTER TABLE orders ADD FOREIGN KEY (withdraw) REFERENCES withdraws(id);
-
-INSERT INTO withdraws (username, withdrawn, order_number) VALUES ('user1', 500, 1212)
-RETURNING withdraws.id;

@@ -201,7 +201,8 @@ func (db *DB) InsertWithdraw(ctx context.Context, w models.Withdraw, l zerolog.L
 
 	for attempt := 0; attempt < retryAttempts; attempt++ {
 		tag, err := begin.Exec(ctx,
-			`UPDATE users SET balance = users.balance - $1 WHERE login = $2;`,
+			`UPDATE users SET balance = users.balance - $1, 
+                 total_withdrawn = COALESCE(users.total_withdrawn, 0) + $1 WHERE login = $2;`,
 			w.Sum, w.User,
 		)
 		if err != nil {
