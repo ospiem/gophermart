@@ -40,7 +40,7 @@ func Test_isValidByLuhnAlgo(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := isValidByLuhnAlgo(tc.orderNum)
+			err := validByLuhnAlgo(tc.orderNum)
 			if tc.wantError {
 				assert.Error(t, err)
 			} else {

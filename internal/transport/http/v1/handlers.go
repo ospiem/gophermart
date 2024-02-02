@@ -141,7 +141,7 @@ func (a *API) insertOrder(w http.ResponseWriter, r *http.Request) {
 		logger.Error().Err(err).Msg("cannot read body")
 	}
 	orderID := string(body)
-	if err = isValidByLuhnAlgo(orderID); err != nil {
+	if err = validByLuhnAlgo(orderID); err != nil {
 		http.Error(w, "Invalid order number", http.StatusBadRequest)
 		logger.Debug().Err(err).Msg("")
 		return
@@ -230,13 +230,19 @@ func (a *API) orderWithdraw(w http.ResponseWriter, r *http.Request) {
 	}
 
 	withdraw := models.Withdraw{}
+	withdraw.User = login
 	dec := json.NewDecoder(r.Body)
 	if err := dec.Decode(&withdraw); err != nil {
 		http.Error(w, invalidBody, http.StatusBadRequest)
 		logger.Error().Err(err)
 		return
 	}
-	withdraw.User = login
+
+	if err := validByLuhnAlgo(withdraw.OrderNumber); err != nil {
+		http.Error(w, "Invalid order number", http.StatusBadRequest)
+		logger.Debug().Err(err).Msg("")
+		return
+	}
 
 	if err := proceedWithdraw(ctx, a, withdraw); err != nil {
 		if errors.Is(err, ErrInsufficientPoints) {
@@ -315,7 +321,7 @@ func buildJWTString(login string, key string) (string, error) {
 	return tokenString, nil
 }
 
-func isValidByLuhnAlgo(orderNum string) error {
+func validByLuhnAlgo(orderNum string) error {
 	re := regexp.MustCompile(`^\d+$`)
 	if !re.MatchString(orderNum) {
 		return fmt.Errorf("order number contains non-digit characters: %s", orderNum)
