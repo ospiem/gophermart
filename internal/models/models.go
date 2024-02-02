@@ -15,10 +15,14 @@ type Order struct {
 	Accrual   float32
 }
 
+type UserBalance struct {
+	Balance   float32 `json:"balance"`
+	Withdrawn float32 `json:"withdrawn"`
+}
+
 type User struct {
 	Credentials
-	Balance   float32
-	Withdrawn float32
+	UserBalance
 }
 
 type Credentials struct {

@@ -92,13 +92,13 @@ func (a *API) authUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	credentials := models.Credentials{}
+	loginCreds := models.Credentials{}
 	dec := json.NewDecoder(r.Body)
-	if err := dec.Decode(&credentials); err != nil {
+	if err := dec.Decode(&loginCreds); err != nil {
 		http.Error(w, invalidBody, http.StatusBadRequest)
 		return
 	}
-	user, err := a.storage.SelectUser(ctx, credentials.Login)
+	dbCreds, err := a.storage.SelectCreds(ctx, loginCreds.Login)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -109,12 +109,12 @@ func (a *API) authUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := compareHash(user.Pass, credentials.Pass); err != nil {
+	if err := compareHash(dbCreds.Pass, loginCreds.Pass); err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	token, err := buildJWTString(credentials.Login, a.cfg.JWTSecretKey)
+	token, err := buildJWTString(loginCreds.Login, a.cfg.JWTSecretKey)
 	if err != nil {
 		http.Error(w, "", http.StatusInternalServerError)
 		logger.Error().Err(err).Msg("cannot build token string")
@@ -294,15 +294,16 @@ func (a *API) getBalance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := a.storage.SelectUser(ctx, login)
+	user, err := a.storage.SelectUserBalance(ctx, login)
 	if err != nil {
 		http.Error(w, "", http.StatusInternalServerError)
 		logger.Error().Err(err).Msg("cannot get balance")
 		return
 	}
-	if err = marshalBalanceAndWithdrawn(user, w); err != nil {
+	enc := json.NewEncoder(w)
+	if err := enc.Encode(user); err != nil {
 		http.Error(w, "", http.StatusInternalServerError)
-		logger.Error().Err(err).Msg("cannot get balance")
+		logger.Error().Err(err).Msg("cannot encode balance")
 	}
 }
 
@@ -381,22 +382,6 @@ func compareHash(dbHash string, reqPass string) error {
 	return nil
 }
 
-func marshalBalanceAndWithdrawn(user models.User, w http.ResponseWriter) error {
-	enc := json.NewEncoder(w)
-
-	err := enc.Encode(struct {
-		Balance   float32 `json:"balance"`
-		Withdrawn float32 `json:"withdrawn"`
-	}{
-		Balance:   user.Balance,
-		Withdrawn: user.Withdrawn})
-	if err != nil {
-		return fmt.Errorf("cannot marshal balance and withdrawn: %w", err)
-	}
-
-	return nil
-}
-
 func proceedWithdraw(ctx context.Context, a *API, withdraw models.Withdraw) error {
 
 	_, err := a.storage.SelectOrder(ctx, withdraw.OrderNumber)
@@ -404,7 +389,7 @@ func proceedWithdraw(ctx context.Context, a *API, withdraw models.Withdraw) erro
 		return fmt.Errorf("cannot select order: %w", err)
 	}
 
-	u, err := a.storage.SelectUser(ctx, withdraw.User)
+	u, err := a.storage.SelectUserBalance(ctx, withdraw.User)
 	if err != nil {
 		return fmt.Errorf("cannot select user: %w", err)
 	}

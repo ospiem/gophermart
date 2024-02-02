@@ -19,7 +19,8 @@ type storage interface {
 	InsertOrder(ctx context.Context, order models.Order, logger zerolog.Logger) error
 	SelectOrder(ctx context.Context, num string) (models.Order, error)
 	SelectOrders(ctx context.Context, user string) ([]models.Order, error)
-	SelectUser(ctx context.Context, login string) (models.User, error)
+	SelectCreds(ctx context.Context, login string) (models.Credentials, error)
+	SelectUserBalance(ctx context.Context, login string) (models.UserBalance, error)
 	InsertUser(ctx context.Context, login string, hash string, l zerolog.Logger) error
 	InsertWithdraw(ctx context.Context, withdraw models.Withdraw, l zerolog.Logger) error
 	SelectWithdraws(ctx context.Context, login string) ([]models.WithdrawResponse, error)

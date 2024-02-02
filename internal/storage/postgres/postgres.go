@@ -142,15 +142,26 @@ func (db *DB) SelectOrders(ctx context.Context, login string) ([]models.Order, e
 	return orders, nil
 }
 
-func (db *DB) SelectUser(ctx context.Context, login string) (models.User, error) {
-	user := models.User{}
+func (db *DB) SelectUserBalance(ctx context.Context, login string) (models.UserBalance, error) {
+	ub := models.UserBalance{}
 	row := db.pool.QueryRow(ctx,
-		`SELECT login, hash_password, COALESCE(balance, 0) as balance
+		`SELECT COALESCE(balance, 0) as balance, COALESCE(total_withdrawn, 0) as total_withdrawn
 			from users where login = $1`, login)
-	if err := row.Scan(&user.Login, &user.Pass, &user.Balance); err != nil {
-		return models.User{}, fmt.Errorf("cannot select user: %w", err)
+	if err := row.Scan(&ub.Balance, &ub.Withdrawn); err != nil {
+		return models.UserBalance{}, fmt.Errorf("cannot select user balance: %w", err)
 	}
-	return user, nil
+	return ub, nil
+}
+
+func (db *DB) SelectCreds(ctx context.Context, login string) (models.Credentials, error) {
+	c := models.Credentials{}
+	row := db.pool.QueryRow(ctx,
+		`SELECT login, hash_password
+			from users where login = $1`, login)
+	if err := row.Scan(&c.Login, &c.Pass); err != nil {
+		return models.Credentials{}, fmt.Errorf("cannot select user balance: %w", err)
+	}
+	return c, nil
 }
 
 func (db *DB) InsertUser(ctx context.Context, login string, hash string, l zerolog.Logger) error {
