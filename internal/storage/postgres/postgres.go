@@ -12,6 +12,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/ospiem/gophermart/internal/models"
+	"github.com/ospiem/gophermart/internal/models/status"
 	"github.com/rs/zerolog"
 )
 
@@ -195,7 +196,11 @@ func (db *DB) InsertUser(ctx context.Context, login string, hash string, l zerol
 func (db *DB) InsertWithdraw(ctx context.Context, w models.Withdraw, l zerolog.Logger) error {
 	logger := l.With().Str("func", "InsertWithdraw").Logger()
 	begin, err := db.pool.Begin(ctx)
-	defer begin.Rollback(ctx)
+	defer func() {
+		if err := begin.Rollback(ctx); err != nil {
+			l.Error().Err(err).Msg("cannot rollback tx")
+		}
+	}()
 
 	if err != nil {
 		return fmt.Errorf("cannot start a transaction: %w", err)
@@ -278,4 +283,52 @@ func (db *DB) SelectWithdraws(ctx context.Context, login string) ([]models.Withd
 		withdrawls = append(withdrawls, wr)
 	}
 	return withdrawls, nil
+}
+
+func (db *DB) SelectOrdersToProceed(ctx context.Context, offset int) ([]models.Order, error) {
+	rows, err := db.pool.Query(ctx,
+		`SELECT (id, status, created_at, COALESCE(accrual, 0) as accrual, username) FROM orders 
+            WHERE status NOT IN ($1, $2) ORDER BY created_at LIMIT $3 OFFSET $3`,
+		status.PROCESSED, status.INVALID, offset,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get orders from db: %w", err)
+	}
+	fmt.Println(rows.CommandTag().RowsAffected())
+	orders := make([]models.Order, 0, rows.CommandTag().RowsAffected())
+	for rows.Next() {
+		var o models.Order
+		if err := rows.Scan(&o.ID, &o.Status, &o.CreatedAt, &o.Accrual, &o.Username); err != nil {
+			return nil, fmt.Errorf("cannot scan order: %w", err)
+		}
+		orders = append(orders, o)
+	}
+	return orders, nil
+}
+
+func (db *DB) UpdateOrder(ctx context.Context, order models.Order, l *zerolog.Logger) error {
+	logger := l.With().Str("func", "UpdateOrders").Logger()
+
+	for attempt := 0; attempt < retryAttempts; attempt++ {
+		tag, err := db.pool.Exec(ctx,
+			`UPDATE orders SET status = $1, accrual = $2 where id = $3`,
+			order.Status, order.Accrual, order.ID)
+		if err != nil {
+			if !isConnException(err) {
+				return fmt.Errorf("cannot start a tx: %w", err)
+			}
+			var sleepTime time.Duration
+			sleepTime += defaultSleepInterval * time.Millisecond
+			logger.Error().Err(err).Msgf("%s %v", connPGError, sleepTime)
+			time.Sleep(sleepTime)
+			continue
+		}
+
+		rowsAffectedCount := tag.RowsAffected()
+		if rowsAffectedCount != 1 {
+			return fmt.Errorf("cannot update oreders: %w", err)
+		}
+		break
+	}
+	return nil
 }

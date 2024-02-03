@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/ospiem/gophermart/internal/config"
+	"github.com/ospiem/gophermart/internal/models"
+	"github.com/ospiem/gophermart/internal/restclient"
 	"github.com/ospiem/gophermart/internal/storage/postgres"
 	api "github.com/ospiem/gophermart/internal/transport/http/v1"
 	"github.com/rs/zerolog"
@@ -61,6 +63,12 @@ func run(logger zerolog.Logger) error {
 	srv := a.InitServer()
 	manageServer(ctx, wg, srv, componentsErrs, &logger)
 
+	r := restclient.New(&cfg, db, &logger)
+	mu := &sync.RWMutex{}
+	delayMap := make(map[string]int, 1)
+	orderCH := make(chan models.Order, r.Cfg.Offset*r.Cfg.WorkersNum)
+	manageClients(ctx, wg, r, mu, delayMap, orderCH)
+
 	select {
 	case <-ctx.Done():
 	case err := <-componentsErrs:
@@ -69,6 +77,52 @@ func run(logger zerolog.Logger) error {
 	}
 
 	return nil
+}
+
+func manageClients(ctx context.Context, wg *sync.WaitGroup, r *restclient.RestClient, mu *sync.RWMutex,
+	delayMap map[string]int, orderCh chan models.Order) {
+	wg.Add(1)
+
+	for i := 0; i < r.Cfg.WorkersNum; i++ {
+		wg.Add(1)
+		go r.ProcessOrder(ctx, wg, mu, delayMap, orderCh)
+	}
+
+	go func() {
+		defer wg.Done() // Decrement the WaitGroup when the goroutine exits
+		for {
+			select {
+			case <-ctx.Done():
+				r.Logger.Info().Msg("Stopped connection manager")
+				return
+
+			default:
+				// Read delay from delayMap using RLock
+				mu.RLock()
+				delay := delayMap[restclient.DelayTime]
+				mu.RUnlock()
+
+				if delay != 0 {
+					// If delay is not zero, sleep and reset delay in delayMap using Lock
+					mu.Lock()
+					time.Sleep(time.Duration(delay) * time.Second)
+					delayMap["delayTime"] = 0
+					mu.Unlock()
+				}
+
+				// Fetch orders from storage
+				orders, err := r.Storage.SelectOrdersToProceed(ctx, r.Cfg.Offset)
+				if err != nil {
+					r.Logger.Err(err)
+				}
+
+				// Send orders to orderCh
+				for _, o := range orders {
+					orderCh <- o
+				}
+			}
+		}
+	}()
 }
 
 func watchDB(ctx context.Context, wg *sync.WaitGroup, db *postgres.DB, l *zerolog.Logger) {
