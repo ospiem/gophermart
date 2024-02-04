@@ -95,7 +95,7 @@ func run(logger zerolog.Logger) error {
 					// If delay is not zero, sleep and reset delay in delayMap using Lock
 					mu.Lock()
 					time.Sleep(time.Duration(delay) * time.Second)
-					delayMap["delayTime"] = 0
+					delayMap[restclient.DelayTime] = 0
 					mu.Unlock()
 				}
 

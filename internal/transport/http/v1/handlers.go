@@ -212,6 +212,7 @@ func (a *API) getOrders(w http.ResponseWriter, r *http.Request) {
 		logger.Error().Err(err).Msg("cannot get orders")
 		return
 	}
+	w.WriteHeader(http.StatusOK)
 }
 
 func (a *API) orderWithdraw(w http.ResponseWriter, r *http.Request) {
@@ -240,7 +241,7 @@ func (a *API) orderWithdraw(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := validByLuhnAlgo(withdraw.OrderNumber); err != nil {
-		http.Error(w, "Invalid order number", http.StatusBadRequest)
+		http.Error(w, "Invalid order number", http.StatusUnprocessableEntity)
 		logger.Debug().Err(err).Msg("")
 		return
 	}
@@ -257,6 +258,7 @@ func (a *API) orderWithdraw(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "", http.StatusInternalServerError)
 		logger.Error().Err(err).Msg("cannot proceed withdraw")
 	}
+	w.WriteHeader(http.StatusOK)
 }
 
 func (a *API) getWithdrawals(w http.ResponseWriter, r *http.Request) {

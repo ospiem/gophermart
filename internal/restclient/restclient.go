@@ -68,7 +68,7 @@ func (r *RestClient) getOrderStatusFromService(order models.Order, mu *sync.RWMu
 	mu.RUnlock()
 	client := http.Client{}
 
-	apiURL := fmt.Sprintf("http://%v/api/orders/%v", r.Cfg.AccrualSysAddress, order.ID)
+	apiURL := fmt.Sprintf("%v/api/orders/%v", r.Cfg.AccrualSysAddress, order.ID)
 	resp, err := client.Get(apiURL)
 	if err != nil {
 		r.Logger.Err(err).Msg("cannot proceed request to accrual")
