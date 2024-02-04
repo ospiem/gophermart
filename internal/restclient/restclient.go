@@ -52,15 +52,14 @@ func (r *RestClient) ProcessOrder(ctx context.Context, wg *sync.WaitGroup, mu *s
 			updatedOrder, err := r.getOrderStatusFromService(ctx, order, mu, delayMap)
 			if err != nil {
 				r.Logger.Err(err)
-
-				if err := r.Storage.UpdateOrder(ctx, updatedOrder, r.Logger); err != nil {
-					r.Logger.Err(err)
-				}
+				continue
 			}
-
+			if err := r.Storage.UpdateOrder(ctx, updatedOrder, r.Logger); err != nil {
+				r.Logger.Err(err)
+			}
 		}
-	}
 
+	}
 }
 
 func (r *RestClient) getOrderStatusFromService(ctx context.Context, order models.Order, mu *sync.RWMutex,
@@ -70,7 +69,6 @@ func (r *RestClient) getOrderStatusFromService(ctx context.Context, order models
 	mu.RLock()
 	_ = delayMap[DelayTime]
 	mu.RUnlock()
-
 	client := http.Client{}
 
 	apiURL := fmt.Sprintf("http://%v/api/orders/%v", r.Cfg.AccrualSysAddress, order.ID)
@@ -101,7 +99,6 @@ func (r *RestClient) getOrderStatusFromService(ctx context.Context, order models
 		mu.Lock()
 		delayMap[DelayTime] = delay
 		mu.Unlock()
-		r.Logger.Debug().Msgf("Got 429 status code, wait for %d seconds", delay)
 	}
 
 	return models.Order{}, errors.New("unknown status code")

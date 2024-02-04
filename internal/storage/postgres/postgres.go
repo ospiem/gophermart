@@ -294,7 +294,7 @@ func (db *DB) SelectOrdersToProceed(ctx context.Context, pagination, offset int)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get orders from db: %w", err)
 	}
-	fmt.Println(rows.CommandTag().RowsAffected())
+
 	orders := make([]models.Order, 0, rows.CommandTag().RowsAffected())
 	for rows.Next() {
 		var o models.Order

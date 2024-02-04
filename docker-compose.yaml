@@ -52,9 +52,8 @@ services:
       dockerfile: build/Dockerfile_accrual
     environment:
       DATABASE_URI: "postgres://gopher:supersecretpass@postgres:5432/gophermart?sslmode=disable"
-      RUN_ADDRESS: "localhost:8081"
     ports:
-      - "8081:8081"
+      - "8081:8080"
     restart: unless-stopped
     platform: linux/amd64
     deploy:
