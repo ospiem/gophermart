@@ -19,7 +19,7 @@ var ErrOrderNotRegister = errors.New("the order does not registered")
 const DelayTime = "delayTime"
 
 type Storage interface {
-	UpdateOrder(ctx context.Context, orders models.Order, l *zerolog.Logger) error
+	ProcessOrderWithBonuses(ctx context.Context, orders models.Order, l *zerolog.Logger) error
 	SelectOrdersToProceed(ctx context.Context, pagination int, offset *int) ([]models.Order, error)
 }
 type RestClient struct {
@@ -53,7 +53,7 @@ func (r *RestClient) ProcessOrder(ctx context.Context, wg *sync.WaitGroup, mu *s
 				r.Logger.Err(err)
 				continue
 			}
-			if err := r.Storage.UpdateOrder(ctx, updatedOrder, r.Logger); err != nil {
+			if err := r.Storage.ProcessOrderWithBonuses(ctx, updatedOrder, r.Logger); err != nil {
 				r.Logger.Err(err)
 			}
 		}

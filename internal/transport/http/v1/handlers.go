@@ -29,6 +29,7 @@ const luhnAlgoDivisor = 10
 const invalidBody = "Invalid body"
 const tokenExp = time.Hour * 336
 const invalitContentTypeNotJSON = "Invalid Content-Type, expected application/json"
+const evenDivisor = 2
 
 var ErrOrderBelongsAnotherUser = errors.New("the order belongs to another user")
 var ErrOrderExists = errors.New("order exists")
@@ -330,7 +331,7 @@ func validByLuhnAlgo(orderNum string) error {
 	}
 
 	var sum int
-	isSecond := len(orderNum)%2 == 0
+	isSecond := len(orderNum)%evenDivisor == 0
 	for _, char := range orderNum {
 		d, err := strconv.Atoi(string(char))
 		if err != nil {

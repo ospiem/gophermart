@@ -195,18 +195,18 @@ func (db *DB) InsertUser(ctx context.Context, login string, hash string, l zerol
 
 func (db *DB) InsertWithdraw(ctx context.Context, w models.Withdraw, l zerolog.Logger) error {
 	logger := l.With().Str("func", "InsertWithdraw").Logger()
-	begin, err := db.pool.Begin(ctx)
+	tx, err := db.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("cannot start a transaction: %w", err)
+	}
 	defer func() {
-		if err := begin.Rollback(ctx); err != nil {
+		if err := tx.Rollback(ctx); err != nil {
 			l.Error().Err(err).Msg("cannot rollback tx")
 		}
 	}()
 
-	if err != nil {
-		return fmt.Errorf("cannot start a transaction: %w", err)
-	}
 	var wID string
-	row := begin.QueryRow(ctx,
+	row := tx.QueryRow(ctx,
 		`INSERT INTO withdraws (username, withdrawn, order_number) VALUES ($1, $2, $3)
 				RETURNING withdraws.id`,
 		w.User, w.Sum, w.OrderNumber,
@@ -216,7 +216,7 @@ func (db *DB) InsertWithdraw(ctx context.Context, w models.Withdraw, l zerolog.L
 	}
 
 	for attempt := 0; attempt < retryAttempts; attempt++ {
-		tag, err := begin.Exec(ctx,
+		tag, err := tx.Exec(ctx,
 			`UPDATE users SET balance = users.balance - $1, 
                  total_withdrawn = COALESCE(users.total_withdrawn, 0) + $1 WHERE login = $2;`,
 			w.Sum, w.User,
@@ -239,7 +239,7 @@ func (db *DB) InsertWithdraw(ctx context.Context, w models.Withdraw, l zerolog.L
 	}
 
 	for attempt := 0; attempt < retryAttempts; attempt++ {
-		tag, err := begin.Exec(ctx,
+		tag, err := tx.Exec(ctx,
 			`UPDATE orders SET  withdraw = $1 WHERE id = $2;`,
 			wID, w.OrderNumber,
 		)
@@ -259,7 +259,7 @@ func (db *DB) InsertWithdraw(ctx context.Context, w models.Withdraw, l zerolog.L
 		}
 		break
 	}
-	if err := begin.Commit(ctx); err != nil {
+	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("cannot commit transaction: %w", err)
 	}
 	return nil
@@ -317,11 +317,20 @@ func (db *DB) SelectOrdersToProceed(ctx context.Context, pagination int, offset 
 	return orders, nil
 }
 
-func (db *DB) UpdateOrder(ctx context.Context, order models.Order, l *zerolog.Logger) error {
+func (db *DB) ProcessOrderWithBonuses(ctx context.Context, order models.Order, l *zerolog.Logger) error {
 	logger := l.With().Str("func", "UpdateOrders").Logger()
+	tx, err := db.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("cannot start a transaction: %w", err)
+	}
+	defer func() {
+		if err := tx.Rollback(ctx); err != nil {
+			l.Error().Err(err).Msg("cannot rollback tx")
+		}
+	}()
 
 	for attempt := 0; attempt < retryAttempts; attempt++ {
-		tag, err := db.pool.Exec(ctx,
+		tag, err := tx.Exec(ctx,
 			`UPDATE orders SET status = $1, accrual = $2 where id = $3`,
 			order.Status, order.Accrual, order.ID)
 		if err != nil {
@@ -337,9 +346,31 @@ func (db *DB) UpdateOrder(ctx context.Context, order models.Order, l *zerolog.Lo
 
 		rowsAffectedCount := tag.RowsAffected()
 		if rowsAffectedCount != 1 {
-			return fmt.Errorf("cannot update oreders: %w", err)
+			return fmt.Errorf("cannot update orders: %w", err)
 		}
 		break
 	}
+
+	for attempt := 0; attempt < retryAttempts; attempt++ {
+		tag, err := tx.Exec(ctx,
+			`UPDATE users SET balance = users.balance + $1`, order.Accrual)
+		if err != nil {
+			if !isConnException(err) {
+				return fmt.Errorf("cannot start a tx: %w", err)
+			}
+			var sleepTime time.Duration
+			sleepTime += defaultSleepInterval * time.Millisecond
+			logger.Error().Err(err).Msgf("%s %v", connPGError, sleepTime)
+			time.Sleep(sleepTime)
+			continue
+		}
+
+		rowsAffectedCount := tag.RowsAffected()
+		if rowsAffectedCount != 1 {
+			return fmt.Errorf("cannot update orders: %w", err)
+		}
+		break
+	}
+
 	return nil
 }
