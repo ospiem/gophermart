@@ -330,8 +330,7 @@ func validByLuhnAlgo(orderNum string) error {
 	}
 
 	var sum int
-	isSecond := false
-
+	isSecond := len(orderNum)%2 == 0
 	for _, char := range orderNum {
 		d, err := strconv.Atoi(string(char))
 		if err != nil {
