@@ -9,11 +9,11 @@ build:
 
 .PHONY: run
 run: build
-	@./cmd/gophermart/gophermart -d "postgres://gopher:supersecretpass@localhost:5432/gophermart?sslmode=disable" -a localhost:8080 -r localhost:8081
+	@./cmd/gophermart/gophermart -d "postgres://gopher:supersecretpass@localhost:5432/gophermart?sslmode=disable" -a localhost:8080 -r http://localhost:8081
 
 .PHONY: debug
 debug: build
-	@./cmd/gophermart/gophermart -d "postgres://gopher:supersecretpass@localhost:5432/gophermart?sslmode=disable" -l debug -a localhost:8080 -r localhost:8081
+	@./cmd/gophermart/gophermart -d "postgres://gopher:supersecretpass@localhost:5432/gophermart?sslmode=disable" -l debug -a localhost:8080 -r http://localhost:8081
 
 .PHONY: postgres
 postgres:

@@ -143,7 +143,7 @@ func (a *API) insertOrder(w http.ResponseWriter, r *http.Request) {
 	}
 	orderID := string(body)
 	if err = validByLuhnAlgo(orderID); err != nil {
-		http.Error(w, "Invalid order number", http.StatusBadRequest)
+		http.Error(w, "Invalid order number", http.StatusUnprocessableEntity)
 		logger.Debug().Err(err).Msg("")
 		return
 	}
