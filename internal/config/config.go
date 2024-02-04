@@ -13,7 +13,7 @@ type Config struct {
 	AccrualSysAddress string `env:"ACCRUAL_SYSTEM_ADDRESS"`
 	LogLevel          string `env:"LOG_LEVEL"`
 	JWTSecretKey      string `env:"SECRET_KEY"`
-	Offset            int    `env:"DB_OFFSET"`
+	Pagination        int    `env:"DB_PAGINATION"`
 	WorkersNum        int    `env:"WORKERS_NUMBER"`
 }
 
@@ -30,11 +30,11 @@ func New() (Config, error) {
 
 func parseFlag(c *Config) {
 	var ep, dsn, accrualEp string
-	flag.StringVar(&ep, "a", "localhost:8080", "set service endpoint")
+	flag.StringVar(&ep, "a", "", "set service endpoint")
 	flag.StringVar(&dsn, "d", "", "set DSN endpoint")
 	flag.StringVar(&accrualEp, "r", "", "set accrual system endpoint")
 	flag.StringVar(&c.LogLevel, "l", "info", "set log level")
-	flag.IntVar(&c.Offset, "offset", 10, "set offset for DB pagination")
+	flag.IntVar(&c.Pagination, "pagination", 10, "set pagination for DB pagination")
 	flag.IntVar(&c.WorkersNum, "w", 3, "set number of workers")
 
 	flag.Parse()

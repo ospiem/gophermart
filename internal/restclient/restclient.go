@@ -20,7 +20,7 @@ const DelayTime = "delayTime"
 
 type Storage interface {
 	UpdateOrder(ctx context.Context, orders models.Order, l *zerolog.Logger) error
-	SelectOrdersToProceed(ctx context.Context, offset int) ([]models.Order, error)
+	SelectOrdersToProceed(ctx context.Context, pagination, offset int) ([]models.Order, error)
 }
 type RestClient struct {
 	Storage Storage
@@ -36,47 +36,34 @@ func New(cfg *config.Config, s Storage, l *zerolog.Logger) *RestClient {
 	}
 }
 
-func (r *RestClient) GetOrders(ctx context.Context, wg *sync.WaitGroup, jobs chan models.Order) {
-	wg.Add(1)
-	offset := 0
-
-	go func() {
-		defer wg.Done()
-		for {
-			orders, err := r.Storage.SelectOrdersToProceed(ctx, offset)
-			if err != nil {
-				r.Logger.Err(err)
-			}
-
-			if len(orders) == 0 {
-				continue
-			}
-
-			for _, o := range orders {
-				jobs <- o
-			}
-			offset += len(orders)
-		}
-	}()
-}
 func (r *RestClient) ProcessOrder(ctx context.Context, wg *sync.WaitGroup, mu *sync.RWMutex,
 	delayMap map[string]int, jobs chan models.Order) {
 
 	defer wg.Done()
 
-	for order := range jobs {
-		updatedOrder, err := r.getOrderStatusFromService(ctx, order, mu, delayMap)
-		if err != nil {
-			r.Logger.Err(err)
+	for {
+		select {
+		case <-ctx.Done():
+			r.Logger.Info().Msg("Stopped worker")
+			return
 
-			if err := r.Storage.UpdateOrder(ctx, updatedOrder, r.Logger); err != nil {
+		case order := <-jobs:
+			r.Logger.Debug().Msgf("got new order %s", order.ID)
+			updatedOrder, err := r.getOrderStatusFromService(ctx, order, mu, delayMap)
+			if err != nil {
 				r.Logger.Err(err)
+
+				if err := r.Storage.UpdateOrder(ctx, updatedOrder, r.Logger); err != nil {
+					r.Logger.Err(err)
+				}
 			}
+
 		}
 	}
+
 }
 
-func (r *RestClient) getOrderStatusFromService(ctx context.Context, toProceed models.Order, mu *sync.RWMutex,
+func (r *RestClient) getOrderStatusFromService(ctx context.Context, order models.Order, mu *sync.RWMutex,
 	delayMap map[string]int) (models.Order, error) {
 
 	// Read from the map to check if the accrual service is available for establishing connections.
@@ -86,7 +73,7 @@ func (r *RestClient) getOrderStatusFromService(ctx context.Context, toProceed mo
 
 	client := http.Client{}
 
-	apiURL := fmt.Sprintf("http://", r.Cfg.AccrualSysAddress, "/api/orders/", toProceed.ID)
+	apiURL := fmt.Sprintf("http://%v/api/orders/%v", r.Cfg.AccrualSysAddress, order.ID)
 	resp, err := client.Get(apiURL)
 	if err != nil {
 		r.Logger.Err(err).Msg("cannot proceed request to accrual")
@@ -101,6 +88,7 @@ func (r *RestClient) getOrderStatusFromService(ctx context.Context, toProceed mo
 	}
 
 	if resp.StatusCode == http.StatusNoContent {
+		r.Logger.Debug().Msg("Order does not registered")
 		return models.Order{}, ErrOrderNotRegister
 	}
 
@@ -113,6 +101,7 @@ func (r *RestClient) getOrderStatusFromService(ctx context.Context, toProceed mo
 		mu.Lock()
 		delayMap[DelayTime] = delay
 		mu.Unlock()
+		r.Logger.Debug().Msgf("Got 429 status code, wait for %d seconds", delay)
 	}
 
 	return models.Order{}, errors.New("unknown status code")

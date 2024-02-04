@@ -18,7 +18,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-const timeoutShutdown = 25 * time.Second
+const timeoutShutdown = 5 * time.Second
 
 func main() {
 	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
@@ -66,30 +66,19 @@ func run(logger zerolog.Logger) error {
 	r := restclient.New(&cfg, db, &logger)
 	mu := &sync.RWMutex{}
 	delayMap := make(map[string]int, 1)
-	orderCH := make(chan models.Order, r.Cfg.Offset*r.Cfg.WorkersNum)
-	manageClients(ctx, wg, r, mu, delayMap, orderCH)
-
-	select {
-	case <-ctx.Done():
-	case err := <-componentsErrs:
-		logger.Error().Err(err)
-		cancelCtx()
-	}
-
-	return nil
-}
-
-func manageClients(ctx context.Context, wg *sync.WaitGroup, r *restclient.RestClient, mu *sync.RWMutex,
-	delayMap map[string]int, orderCh chan models.Order) {
-	wg.Add(1)
+	orderCh := make(chan models.Order, r.Cfg.Pagination*r.Cfg.WorkersNum)
 
 	for i := 0; i < r.Cfg.WorkersNum; i++ {
 		wg.Add(1)
 		go r.ProcessOrder(ctx, wg, mu, delayMap, orderCh)
+		r.Logger.Debug().Msgf("Started worker #%d", i+1)
 	}
 
+	wg.Add(1)
+	// Connection manager
 	go func() {
 		defer wg.Done() // Decrement the WaitGroup when the goroutine exits
+		offset := 0
 		for {
 			select {
 			case <-ctx.Done():
@@ -111,18 +100,27 @@ func manageClients(ctx context.Context, wg *sync.WaitGroup, r *restclient.RestCl
 				}
 
 				// Fetch orders from storage
-				orders, err := r.Storage.SelectOrdersToProceed(ctx, r.Cfg.Offset)
+				orders, err := r.Storage.SelectOrdersToProceed(ctx, r.Cfg.Pagination, offset)
 				if err != nil {
 					r.Logger.Err(err)
 				}
-
 				// Send orders to orderCh
 				for _, o := range orders {
 					orderCh <- o
 				}
+				offset += len(orders)
 			}
 		}
 	}()
+
+	select {
+	case <-ctx.Done():
+	case err := <-componentsErrs:
+		logger.Error().Err(err)
+		cancelCtx()
+	}
+
+	return nil
 }
 
 func watchDB(ctx context.Context, wg *sync.WaitGroup, db *postgres.DB, l *zerolog.Logger) {

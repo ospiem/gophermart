@@ -285,11 +285,11 @@ func (db *DB) SelectWithdraws(ctx context.Context, login string) ([]models.Withd
 	return withdrawls, nil
 }
 
-func (db *DB) SelectOrdersToProceed(ctx context.Context, offset int) ([]models.Order, error) {
+func (db *DB) SelectOrdersToProceed(ctx context.Context, pagination, offset int) ([]models.Order, error) {
 	rows, err := db.pool.Query(ctx,
-		`SELECT (id, status, created_at, COALESCE(accrual, 0) as accrual, username) FROM orders 
-            WHERE status NOT IN ($1, $2) ORDER BY created_at LIMIT $3 OFFSET $3`,
-		status.PROCESSED, status.INVALID, offset,
+		`SELECT id, status, created_at, COALESCE(accrual, 0) as accrual, username FROM orders 
+            WHERE status NOT IN ($1, $2) ORDER BY created_at LIMIT $3 OFFSET $4`,
+		status.PROCESSED, status.INVALID, pagination, offset,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get orders from db: %w", err)
