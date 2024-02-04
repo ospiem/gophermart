@@ -69,7 +69,14 @@ func (r *RestClient) getOrderStatusFromService(order models.Order, mu *sync.RWMu
 	client := http.Client{}
 
 	apiURL := fmt.Sprintf("%v/api/orders/%v", r.Cfg.AccrualSysAddress, order.ID)
-	resp, err := client.Get(apiURL)
+	request, err := http.NewRequest(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return models.Order{}, fmt.Errorf("cannot generate request: %w", err)
+	}
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Content-Encoding", "gzip")
+
+	resp, err := client.Do(request)
 	if err != nil {
 		r.Logger.Err(err).Msg("cannot proceed request to accrual")
 	}
