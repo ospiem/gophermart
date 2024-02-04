@@ -7,6 +7,9 @@ import (
 	"github.com/caarlos0/env/v9"
 )
 
+const defaultPagination = 10
+const defaultNumberOfWorkers = 3
+
 type Config struct {
 	Endpoint          string `env:"RUN_ADDRESS"`
 	DSN               string `env:"DATABASE_URI"`
@@ -17,7 +20,6 @@ type Config struct {
 	WorkersNum        int    `env:"WORKERS_NUMBER"`
 }
 
-// TODO: separate configs
 func New() (Config, error) {
 	var c Config
 	err := env.Parse(&c)
@@ -34,8 +36,8 @@ func parseFlag(c *Config) {
 	flag.StringVar(&dsn, "d", "", "set DSN endpoint")
 	flag.StringVar(&accrualEp, "r", "", "set accrual system endpoint")
 	flag.StringVar(&c.LogLevel, "l", "info", "set log level")
-	flag.IntVar(&c.Pagination, "pagination", 10, "set pagination for DB pagination")
-	flag.IntVar(&c.WorkersNum, "w", 3, "set number of workers")
+	flag.IntVar(&c.Pagination, "pagination", defaultPagination, "set pagination for DB pagination")
+	flag.IntVar(&c.WorkersNum, "w", defaultNumberOfWorkers, "set number of workers")
 
 	flag.Parse()
 
@@ -49,3 +51,5 @@ func parseFlag(c *Config) {
 		c.AccrualSysAddress = accrualEp
 	}
 }
+
+// TODO: separate configs.

@@ -38,7 +38,6 @@ func New(cfg *config.Config, s Storage, l *zerolog.Logger) *RestClient {
 
 func (r *RestClient) ProcessOrder(ctx context.Context, wg *sync.WaitGroup, mu *sync.RWMutex,
 	delayMap map[string]int, jobs chan models.Order) {
-
 	defer wg.Done()
 
 	for {
@@ -49,7 +48,7 @@ func (r *RestClient) ProcessOrder(ctx context.Context, wg *sync.WaitGroup, mu *s
 
 		case order := <-jobs:
 			r.Logger.Debug().Msgf("got new order %s", order.ID)
-			updatedOrder, err := r.getOrderStatusFromService(ctx, order, mu, delayMap)
+			updatedOrder, err := r.getOrderStatusFromService(order, mu, delayMap)
 			if err != nil {
 				r.Logger.Err(err)
 				continue
@@ -58,13 +57,11 @@ func (r *RestClient) ProcessOrder(ctx context.Context, wg *sync.WaitGroup, mu *s
 				r.Logger.Err(err)
 			}
 		}
-
 	}
 }
 
-func (r *RestClient) getOrderStatusFromService(ctx context.Context, order models.Order, mu *sync.RWMutex,
+func (r *RestClient) getOrderStatusFromService(order models.Order, mu *sync.RWMutex,
 	delayMap map[string]int) (models.Order, error) {
-
 	// Read from the map to check if the accrual service is available for establishing connections.
 	mu.RLock()
 	_ = delayMap[DelayTime]
@@ -76,6 +73,11 @@ func (r *RestClient) getOrderStatusFromService(ctx context.Context, order models
 	if err != nil {
 		r.Logger.Err(err).Msg("cannot proceed request to accrual")
 	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			r.Logger.Err(err).Msg("cannot close body")
+		}
+	}()
 
 	if resp.StatusCode == http.StatusOK {
 		order := models.Order{}

@@ -28,6 +28,7 @@ const contentType = "Content-Type"
 const luhnAlgoDivisor = 10
 const invalidBody = "Invalid body"
 const tokenExp = time.Hour * 336
+const invalitContentTypeNotJSON = "Invalid Content-Type, expected application/json"
 
 var ErrOrderBelongsAnotherUser = errors.New("the order belongs to another user")
 var ErrOrderExists = errors.New("order exists")
@@ -37,7 +38,7 @@ func (a *API) registerUser(w http.ResponseWriter, r *http.Request) {
 	logger := a.log.With().Str(handler, "registerUser").Logger()
 
 	if r.Header.Get(contentType) != applicationJSON {
-		http.Error(w, "Invalid Content-Type, expected application/json", http.StatusBadRequest)
+		http.Error(w, invalitContentTypeNotJSON, http.StatusBadRequest)
 		logger.Debug().Msg(invalidContentType)
 		return
 	}
@@ -86,7 +87,7 @@ func (a *API) authUser(w http.ResponseWriter, r *http.Request) {
 	logger := a.log.With().Str(handler, "authUser").Logger()
 
 	if r.Header.Get(contentType) != applicationJSON {
-		http.Error(w, "Invalid Content-Type, expected application/json", http.StatusBadRequest)
+		http.Error(w, invalitContentTypeNotJSON, http.StatusBadRequest)
 		logger.Debug().Msg(invalidContentType)
 		return
 	}
@@ -216,7 +217,7 @@ func (a *API) getOrders(w http.ResponseWriter, r *http.Request) {
 func (a *API) orderWithdraw(w http.ResponseWriter, r *http.Request) {
 	logger := a.log.With().Str(handler, "orderWithdraw").Logger()
 	if r.Header.Get(contentType) != applicationJSON {
-		http.Error(w, "Invalid Content-Type, expected application/json", http.StatusBadRequest)
+		http.Error(w, invalitContentTypeNotJSON, http.StatusBadRequest)
 		logger.Debug().Msg(invalidContentType)
 		return
 	}
@@ -256,7 +257,6 @@ func (a *API) orderWithdraw(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "", http.StatusInternalServerError)
 		logger.Error().Err(err).Msg("cannot proceed withdraw")
 	}
-
 }
 
 func (a *API) getWithdrawals(w http.ResponseWriter, r *http.Request) {
@@ -281,7 +281,6 @@ func (a *API) getWithdrawals(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "", http.StatusInternalServerError)
 		logger.Error().Err(err).Msg("cannot marshal withdraws")
 	}
-
 }
 
 func (a *API) getBalance(w http.ResponseWriter, r *http.Request) {
@@ -332,7 +331,6 @@ func validByLuhnAlgo(orderNum string) error {
 	isSecond := false
 
 	for _, char := range orderNum {
-
 		d, err := strconv.Atoi(string(char))
 		if err != nil {
 			return fmt.Errorf("cannot convert string to int: %w", err)
@@ -383,7 +381,6 @@ func compareHash(dbHash string, reqPass string) error {
 }
 
 func proceedWithdraw(ctx context.Context, a *API, withdraw models.Withdraw) error {
-
 	_, err := a.storage.SelectOrder(ctx, withdraw.OrderNumber)
 	if err != nil {
 		return fmt.Errorf("cannot select order: %w", err)

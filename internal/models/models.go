@@ -37,12 +37,12 @@ type Claims struct {
 
 type Withdraw struct {
 	OrderNumber string  `json:"order"`
-	Sum         float32 `json:"sum"`
 	User        string  `json:"-"`
+	Sum         float32 `json:"sum"`
 }
 
 type WithdrawResponse struct {
+	ProcessedAt time.Time `json:"processed_at"`
 	Order       string    `json:"order"`
 	Sum         float32   `json:"sum"`
-	ProcessedAt time.Time `json:"processed_at"`
 }

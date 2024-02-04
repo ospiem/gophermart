@@ -131,7 +131,7 @@ func (db *DB) SelectOrders(ctx context.Context, login string) ([]models.Order, e
 		return nil, fmt.Errorf("postgres failed to get orders: %w", err)
 	}
 
-	//TODO: paginate it
+	//TODO: paginate it.
 	orders := make([]models.Order, 0, rows.CommandTag().RowsAffected())
 	for rows.Next() {
 		order := models.Order{}
@@ -303,6 +303,7 @@ func (db *DB) SelectOrdersToProceed(ctx context.Context, pagination, offset int)
 		}
 		orders = append(orders, o)
 	}
+	fmt.Println(offset)
 	return orders, nil
 }
 
