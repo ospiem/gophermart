@@ -18,7 +18,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-const timeoutShutdown = 5 * time.Second
+const timeoutShutdown = 25 * time.Second
 
 func main() {
 	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
@@ -100,7 +100,7 @@ func run(logger zerolog.Logger) error {
 				}
 
 				// Fetch orders from storage
-				orders, err := r.Storage.SelectOrdersToProceed(ctx, r.Cfg.Pagination, offset)
+				orders, err := r.Storage.SelectOrdersToProceed(ctx, r.Cfg.Pagination, &offset)
 				if err != nil {
 					r.Logger.Err(err)
 				}

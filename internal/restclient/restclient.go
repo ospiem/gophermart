@@ -20,7 +20,7 @@ const DelayTime = "delayTime"
 
 type Storage interface {
 	UpdateOrder(ctx context.Context, orders models.Order, l *zerolog.Logger) error
-	SelectOrdersToProceed(ctx context.Context, pagination, offset int) ([]models.Order, error)
+	SelectOrdersToProceed(ctx context.Context, pagination int, offset *int) ([]models.Order, error)
 }
 type RestClient struct {
 	Storage Storage
