@@ -252,7 +252,7 @@ func (a *API) orderWithdraw(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Insufficient points", http.StatusPaymentRequired)
 			return
 		}
-		if errors.Is(pgx.ErrNoRows, err) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			http.Error(w, "Insufficient points", http.StatusUnprocessableEntity)
 			return
 		}
