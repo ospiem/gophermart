@@ -48,7 +48,7 @@ func (r *RestClient) ProcessOrder(ctx context.Context, wg *sync.WaitGroup, mu *s
 
 		case order := <-jobs:
 			r.Logger.Debug().Msgf("got new order %s", order.ID)
-			updatedOrder, err := r.getOrderStatusFromService(order, mu, delayMap)
+			updatedOrder, err := r.getOrderStatusFromService(ctx, order, mu, delayMap)
 			if err != nil {
 				r.Logger.Err(err)
 				continue
@@ -60,7 +60,7 @@ func (r *RestClient) ProcessOrder(ctx context.Context, wg *sync.WaitGroup, mu *s
 	}
 }
 
-func (r *RestClient) getOrderStatusFromService(order models.Order, mu *sync.RWMutex,
+func (r *RestClient) getOrderStatusFromService(ctx context.Context, order models.Order, mu *sync.RWMutex,
 	delayMap map[string]int) (models.Order, error) {
 	// Read from the map to check if the accrual service is available for establishing connections.
 	mu.RLock()
@@ -69,7 +69,7 @@ func (r *RestClient) getOrderStatusFromService(order models.Order, mu *sync.RWMu
 	client := http.Client{}
 
 	apiURL := fmt.Sprintf("%v/api/orders/%v", r.Cfg.AccrualSysAddress, order.ID)
-	request, err := http.NewRequest(http.MethodGet, apiURL, nil)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
 	if err != nil {
 		return models.Order{}, fmt.Errorf("cannot generate request: %w", err)
 	}
