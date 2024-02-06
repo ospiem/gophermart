@@ -127,8 +127,8 @@ func (a *API) authUser(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (a *API) insertOrder(w http.ResponseWriter, r *http.Request) {
-	logger := a.log.With().Str(handler, "insertOrder").Logger()
+func (a *API) postOrder(w http.ResponseWriter, r *http.Request) {
+	logger := a.log.With().Str(handler, "postOrder").Logger()
 
 	if r.Header.Get(contentType) != "text/plain" {
 		http.Error(w, "Invalid Content-Type, expected text/plain", http.StatusBadRequest)
@@ -139,7 +139,7 @@ func (a *API) insertOrder(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "", http.StatusInternalServerError)
+		http.Error(w, "", http.StatusBadRequest)
 		logger.Error().Err(err).Msg("cannot read body")
 	}
 	orderID := string(body)

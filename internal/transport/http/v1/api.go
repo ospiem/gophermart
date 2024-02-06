@@ -52,7 +52,7 @@ func (a *API) registerAPI() chi.Router {
 
 		r.Group(func(r chi.Router) {
 			r.Use(auth.JWTAuthorization(a.cfg.JWTSecretKey))
-			r.Post("/orders", a.insertOrder)
+			r.Post("/orders", a.postOrder)
 			r.Get("/orders", a.getOrders)
 			r.Get("/withdrawals", a.getWithdrawals)
 
