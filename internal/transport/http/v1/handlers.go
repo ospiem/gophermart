@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -323,30 +325,30 @@ func buildJWTString(login string, key string) (string, error) {
 }
 
 func validByLuhnAlgo(orderNum string) error {
-	//re := regexp.MustCompile(`^\d+$`)
-	//if !re.MatchString(orderNum) {
-	//	return fmt.Errorf("order number contains non-digit characters: %s", orderNum)
-	//}
-	//
-	//var sum int
-	//isSecond := len(orderNum)%evenDivisor == 0
-	//for _, char := range orderNum {
-	//	d, err := strconv.Atoi(string(char))
-	//	if err != nil {
-	//		return fmt.Errorf("cannot convert string to int: %w", err)
-	//	}
-	//
-	//	if isSecond {
-	//		d *= 2
-	//	}
-	//	sum += d / luhnAlgoDivisor
-	//	sum += d % luhnAlgoDivisor
-	//	isSecond = !isSecond
-	//}
-	//
-	//if !(sum%luhnAlgoDivisor == 0) {
-	//	return fmt.Errorf("the sum of the digits is not divisible by 10")
-	//}
+	re := regexp.MustCompile(`^\d+$`)
+	if !re.MatchString(orderNum) {
+		return fmt.Errorf("order number contains non-digit characters: %s", orderNum)
+	}
+
+	var sum int
+	isSecond := len(orderNum)%evenDivisor == 0
+	for _, char := range orderNum {
+		d, err := strconv.Atoi(string(char))
+		if err != nil {
+			return fmt.Errorf("cannot convert string to int: %w", err)
+		}
+
+		if isSecond {
+			d *= 2
+		}
+		sum += d / luhnAlgoDivisor
+		sum += d % luhnAlgoDivisor
+		isSecond = !isSecond
+	}
+
+	if !(sum%luhnAlgoDivisor == 0) {
+		return fmt.Errorf("the sum of the digits is not divisible by 10")
+	}
 	return nil
 }
 

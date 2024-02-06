@@ -5,7 +5,7 @@ export SHELL=/bin/zsh
 
 .PHONY: build
 build:
-	@go build -o ./cmd/gophermart/gophermart ./cmd/gophermart/main.go
+	@go build -o ./cmd/gophermart/gophermart ./cmd/gophermart/*.go
 
 .PHONY: run
 run: build
