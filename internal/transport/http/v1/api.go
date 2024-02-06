@@ -10,7 +10,6 @@ import (
 	"github.com/ospiem/gophermart/internal/models"
 	"github.com/ospiem/gophermart/internal/tools"
 	"github.com/ospiem/gophermart/internal/transport/http/v1/middleware/auth"
-	"github.com/ospiem/gophermart/internal/transport/http/v1/middleware/compress"
 	"github.com/ospiem/gophermart/internal/transport/http/v1/middleware/logger"
 	"github.com/rs/zerolog"
 )
@@ -45,9 +44,7 @@ func (a *API) registerAPI() chi.Router {
 	r := chi.NewRouter()
 
 	r.Use(middleware.Recoverer)
-	r.Use(compress.DecompressRequest(a.log))
 	r.Use(logger.RequestLogger(a.log))
-	r.Use(compress.CompressResponse(a.log))
 
 	r.Route("/api/user", func(r chi.Router) {
 		r.Post("/register", a.registerUser)
