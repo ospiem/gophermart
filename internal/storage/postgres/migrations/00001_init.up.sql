@@ -14,7 +14,7 @@ CREATE TABLE orders (
     created_at TIMESTAMP DEFAULT now() NOT NULL ,
     accrual REAL NULL,
     username VARCHAR(200) NOT NULL ,
-    withdraw UUID NOT NULL ,
+    withdraw UUID NULL ,
     CONSTRAINT accrual_positive_check CHECK (accrual::numeric >= 0),
     FOREIGN KEY(username) REFERENCES users(login)
 );
