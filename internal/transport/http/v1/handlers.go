@@ -389,7 +389,7 @@ func proceedWithdraw(ctx context.Context, a *API, withdraw models.Withdraw) erro
 		Status:   status.NEW,
 	}
 	if err := a.storage.InsertOrder(ctx, order, a.log); err != nil {
-		return fmt.Errorf("cannot insert order: %w")
+		return fmt.Errorf("cannot insert order: %w", err)
 	}
 	u, err := a.storage.SelectUserBalance(ctx, withdraw.User)
 	if err != nil {
