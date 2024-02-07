@@ -252,10 +252,10 @@ func (a *API) orderWithdraw(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Insufficient points", http.StatusPaymentRequired)
 			return
 		}
-		//if errors.Is(err, pgx.ErrNoRows) {
-		//	http.Error(w, "Insufficient points", http.StatusUnprocessableEntity)
-		//	return
-		//}
+		if errors.Is(err, pgx.ErrNoRows) {
+			http.Error(w, "Insufficient points", http.StatusUnprocessableEntity)
+			return
+		}
 		http.Error(w, "", http.StatusInternalServerError)
 		logger.Error().Err(err).Msg("cannot proceed withdraw")
 	}
@@ -383,10 +383,10 @@ func compareHash(dbHash string, reqPass string) error {
 }
 
 func proceedWithdraw(ctx context.Context, a *API, withdraw models.Withdraw) error {
-	_, err := a.storage.SelectOrder(ctx, withdraw.OrderNumber)
-	if err != nil {
-		return fmt.Errorf("cannot select order: %w", err)
-	}
+	//_, err := a.storage.SelectOrder(ctx, withdraw.OrderNumber)
+	//if err != nil {
+	//	return fmt.Errorf("cannot select order: %w", err)
+	//}
 
 	u, err := a.storage.SelectUserBalance(ctx, withdraw.User)
 	if err != nil {
