@@ -384,7 +384,9 @@ func compareHash(dbHash string, reqPass string) error {
 
 func proceedWithdraw(ctx context.Context, a *API, withdraw models.Withdraw) error {
 	order := models.Order{
-		ID: withdraw.OrderNumber,
+		ID:       withdraw.OrderNumber,
+		Username: withdraw.User,
+		Status:   status.NEW,
 	}
 	if err := a.storage.InsertOrder(ctx, order, a.log); err != nil {
 		return fmt.Errorf("cannot insert order: %w")
