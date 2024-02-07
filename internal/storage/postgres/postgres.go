@@ -10,6 +10,7 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/ospiem/gophermart/internal/models"
 	"github.com/ospiem/gophermart/internal/models/status"
@@ -325,52 +326,52 @@ func (db *DB) ProcessOrderWithBonuses(ctx context.Context, order models.Order, l
 	}
 	defer func() {
 		if err := tx.Rollback(ctx); err != nil {
-			l.Error().Err(err).Msg("cannot rollback tx")
+			logger.Error().Err(err).Msg("cannot rollback tx")
 		}
 	}()
-
-	for attempt := 0; attempt < retryAttempts; attempt++ {
-		tag, err := tx.Exec(ctx,
-			`UPDATE orders SET status = $1, accrual = $2 where id = $3`,
-			order.Status, order.Accrual, order.ID)
+	if order.Status != status.PROCESSED {
+		err := updateWithRetry(ctx, tx, `UPDATE orders set status = $1 where id = $2`,
+			order.Status, order.ID)
 		if err != nil {
-			if !isConnException(err) {
-				return fmt.Errorf("cannot start a tx: %w", err)
-			}
-			var sleepTime time.Duration
-			sleepTime += defaultSleepInterval * time.Millisecond
-			logger.Error().Err(err).Msgf("%s %v", connPGError, sleepTime)
-			time.Sleep(sleepTime)
-			continue
+			return fmt.Errorf("cannot update status: %w", err)
 		}
 
-		rowsAffectedCount := tag.RowsAffected()
-		if rowsAffectedCount != 1 {
-			return fmt.Errorf("cannot update orders: %w", err)
-		}
-		break
+		return nil
 	}
 
-	for attempt := 0; attempt < retryAttempts; attempt++ {
-		tag, err := tx.Exec(ctx,
-			`UPDATE users SET balance = users.balance + $1`, order.Accrual)
-		if err != nil {
-			if !isConnException(err) {
-				return fmt.Errorf("cannot start a tx: %w", err)
-			}
-			var sleepTime time.Duration
-			sleepTime += defaultSleepInterval * time.Millisecond
-			logger.Error().Err(err).Msgf("%s %v", connPGError, sleepTime)
-			time.Sleep(sleepTime)
-			continue
-		}
+	err = updateWithRetry(ctx, tx, `UPDATE orders SET status = $1, accrual = $2 where id = $3`,
+		order.Status, order.Accrual, order.ID)
+	if err != nil {
+		return fmt.Errorf("cannot update status and accrual: %w", err)
+	}
 
-		rowsAffectedCount := tag.RowsAffected()
-		if rowsAffectedCount != 1 {
-			return fmt.Errorf("cannot update orders: %w", err)
-		}
-		break
+	err = updateWithRetry(ctx, tx, `UPDATE users SET balance = users.balance + $1`, order.Accrual)
+	if err != nil {
+		return fmt.Errorf("cannot update user's balance: %w", err)
 	}
 
 	return nil
+}
+
+func updateWithRetry(ctx context.Context, tx pgx.Tx, query string, args ...interface{}) error {
+	for attempt := 0; attempt < retryAttempts; attempt++ {
+		tag, err := tx.Exec(ctx, query, args...)
+		if err != nil {
+			if !isConnException(err) {
+				return fmt.Errorf("failed to execute query: %w", err)
+			}
+			var sleepTime time.Duration
+			sleepTime += defaultSleepInterval * time.Millisecond
+			time.Sleep(sleepTime)
+			continue
+		}
+
+		rowsAffectedCount := tag.RowsAffected()
+		if rowsAffectedCount != 1 {
+			return fmt.Errorf("expected 1 row affected, got %d", rowsAffectedCount)
+		}
+		return nil
+	}
+
+	return fmt.Errorf("reached maximum retry attempts")
 }

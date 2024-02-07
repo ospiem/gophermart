@@ -16,6 +16,7 @@ import (
 )
 
 var ErrOrderNotRegister = errors.New("the order does not registered")
+var ErrTooManyRequests = errors.New("too many requests")
 
 const DelayTime = "delayTime"
 
@@ -102,8 +103,10 @@ func (r *RestClient) ProcessOrder(ctx context.Context, wg *sync.WaitGroup, mu *s
 			r.Logger.Debug().Msgf("got new order %s", order.ID)
 			updatedOrder, err := r.getOrderStatusFromService(ctx, order, mu, delayMap)
 			if err != nil {
-				r.Logger.Err(err)
-				continue
+				if !errors.Is(err, ErrOrderNotRegister) && !errors.Is(err, ErrTooManyRequests) {
+					r.Logger.Err(err).Msg("cannot get order status from accrual")
+					continue
+				}
 			}
 			if err := r.Storage.ProcessOrderWithBonuses(ctx, updatedOrder, r.Logger); err != nil {
 				r.Logger.Err(err)
@@ -150,7 +153,6 @@ func (r *RestClient) getOrderStatusFromService(ctx context.Context, order models
 		}
 
 		if resp.StatusCode == http.StatusNoContent {
-			r.Logger.Debug().Msg("Order does not registered")
 			return models.Order{}, ErrOrderNotRegister
 		}
 
@@ -163,6 +165,7 @@ func (r *RestClient) getOrderStatusFromService(ctx context.Context, order models
 			mu.Lock()
 			delayMap[DelayTime] = delay
 			mu.Unlock()
+			return models.Order{}, ErrTooManyRequests
 		}
 		return models.Order{}, fmt.Errorf("unknown status code %d", resp.StatusCode)
 	}
