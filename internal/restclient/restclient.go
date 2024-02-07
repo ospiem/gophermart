@@ -149,7 +149,6 @@ func (r *RestClient) getOrderStatusFromService(ctx context.Context, order models
 			if err := json.NewDecoder(resp.Body).Decode(&order); err != nil {
 				return models.Order{}, fmt.Errorf("cannot decode response: %w", err)
 			}
-			r.Logger.Info().Any("order", order).Msg("")
 			return order, nil
 		}
 

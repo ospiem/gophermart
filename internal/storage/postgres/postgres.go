@@ -319,7 +319,7 @@ func (db *DB) SelectOrdersToProceed(ctx context.Context, pagination int, offset 
 }
 
 func (db *DB) ProcessOrderWithBonuses(ctx context.Context, order models.Order, l *zerolog.Logger) error {
-	logger := l.With().Str("func", "UpdateOrders").Logger()
+	logger := l.With().Str("func", "ProcessOrderWithBonuses").Logger()
 	tx, err := db.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("cannot start a transaction: %w", err)
