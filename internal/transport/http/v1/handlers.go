@@ -241,21 +241,21 @@ func (a *API) orderWithdraw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//if err := validByLuhnAlgo(withdraw.OrderNumber); err != nil {
-	//	http.Error(w, "Invalid order number", http.StatusUnprocessableEntity)
-	//	logger.Debug().Err(err).Msg("")
-	//	return
-	//}
+	if err := validByLuhnAlgo(withdraw.OrderNumber); err != nil {
+		http.Error(w, "Invalid order number", http.StatusUnprocessableEntity)
+		logger.Debug().Err(err).Msg("")
+		return
+	}
 
 	if err := proceedWithdraw(ctx, a, withdraw); err != nil {
 		if errors.Is(err, ErrInsufficientPoints) {
 			http.Error(w, "Insufficient points", http.StatusPaymentRequired)
 			return
 		}
-		if errors.Is(err, pgx.ErrNoRows) {
-			http.Error(w, "Insufficient points", http.StatusUnprocessableEntity)
-			return
-		}
+		//if errors.Is(err, pgx.ErrNoRows) {
+		//	http.Error(w, "Insufficient points", http.StatusUnprocessableEntity)
+		//	return
+		//}
 		http.Error(w, "", http.StatusInternalServerError)
 		logger.Error().Err(err).Msg("cannot proceed withdraw")
 	}
