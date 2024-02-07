@@ -383,11 +383,12 @@ func compareHash(dbHash string, reqPass string) error {
 }
 
 func proceedWithdraw(ctx context.Context, a *API, withdraw models.Withdraw) error {
-	//_, err := a.storage.SelectOrder(ctx, withdraw.OrderNumber)
-	//if err != nil {
-	//	return fmt.Errorf("cannot select order: %w", err)
-	//}
-
+	order := models.Order{
+		ID: withdraw.OrderNumber,
+	}
+	if err := a.storage.InsertOrder(ctx, order, a.log); err != nil {
+		return fmt.Errorf("cannot insert order: %w")
+	}
 	u, err := a.storage.SelectUserBalance(ctx, withdraw.User)
 	if err != nil {
 		return fmt.Errorf("cannot select user: %w", err)
