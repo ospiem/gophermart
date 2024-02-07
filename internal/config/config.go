@@ -8,7 +8,7 @@ import (
 )
 
 const defaultPagination = 10
-const defaultNumberOfWorkers = 30
+const defaultNumberOfWorkers = 3
 
 type Config struct {
 	Endpoint          string `env:"RUN_ADDRESS"`
