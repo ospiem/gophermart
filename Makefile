@@ -5,7 +5,7 @@ export SHELL=/bin/zsh
 
 .PHONY: build
 build:
-	@go build -o ./cmd/gophermart/gophermart ./cmd/gophermart/*.go
+	go build -o ./cmd/gophermart/gophermart ./cmd/gophermart/*.go
 
 .PHONY: run
 run: build
@@ -49,6 +49,14 @@ _golangci-lint-rm-unformatted-report: _golangci-lint-format-report
 golangci-lint-clean:
 	sudo rm -rf ./golangci-lint matted.json > ./golangci-lint/report.json
 
-.PHONY:
+.PHONY: compose
+compose: build
+	docker compose up -d
+
+.PHONY: test
+test:
+	./run.sh
+
+.PHONY: truncate
 truncate:
-	@docker exec postgres psql -U mcollector -d metrics -c 'truncate table counters, gauges;'ncate table counters, gauges;'
+	docker exec -it postgres psql -U gopher -d gophermart -c 'truncate table users, users, withdraws cascade;'

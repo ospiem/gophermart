@@ -17,7 +17,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-const timeoutShutdown = 25 * time.Second
+const timeoutShutdown = 5 * time.Second
 
 func Run(logger zerolog.Logger) error {
 	ctx, cancelCtx := signal.NotifyContext(context.Background(), os.Interrupt)

@@ -78,7 +78,7 @@ func (r *RestClient) Run(ctx context.Context, wg *sync.WaitGroup) {
 				// Fetch orders from storage
 				orders, err := r.Storage.SelectOrdersToProceed(ctx, r.Cfg.Pagination, &offset)
 				if err != nil {
-					logger.Error().Err(err).Msg("")
+					logger.Error().Err(err).Msg("cannot select order to proceed")
 				}
 				// Send orders to orderCh
 				for _, o := range orders {
@@ -109,9 +109,11 @@ func (r *RestClient) ProcessOrder(ctx context.Context, wg *sync.WaitGroup, mu *s
 					logger.Error().Err(err).Msg("cannot get order status from accrual")
 					continue
 				}
+				// error is ErrOrderNotRegister or ErrTooManyRequests
+				continue
 			}
 			if err := r.Storage.ProcessOrderWithBonuses(ctx, updatedOrder, r.Logger); err != nil {
-				logger.Error().Err(err).Msg("")
+				logger.Error().Err(err).Msg("cannot proceed order with bonuses")
 			}
 		}
 	}
@@ -148,11 +150,12 @@ func (r *RestClient) getOrderStatusFromService(ctx context.Context, order models
 
 	if resp != nil {
 		if resp.StatusCode == http.StatusOK {
-			order := models.Order{}
-			if err := json.NewDecoder(resp.Body).Decode(&order); err != nil {
+			o := models.Order{}
+			if err := json.NewDecoder(resp.Body).Decode(&o); err != nil {
 				return models.Order{}, fmt.Errorf("cannot decode response: %w", err)
 			}
-			return order, nil
+			o.ID = order.ID
+			return o, nil
 		}
 
 		if resp.StatusCode == http.StatusNoContent {

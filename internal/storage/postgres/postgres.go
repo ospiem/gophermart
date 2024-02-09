@@ -335,21 +335,27 @@ func (db *DB) ProcessOrderWithBonuses(ctx context.Context, order models.Order, l
 		if err != nil {
 			return fmt.Errorf("cannot update status: %w", err)
 		}
-
+		if err = tx.Commit(ctx); err != nil {
+			return fmt.Errorf("cannot commit transaction: %w", err)
+		}
 		return nil
 	}
 
-	err = updateWithRetry(ctx, tx, `UPDATE orders SET status = $1, accrual = $2 where id = $3`,
+	row := tx.QueryRow(ctx,
+		`UPDATE orders SET status = $1, accrual = $2 where id = $3 RETURNING username;`,
 		order.Status, order.Accrual, order.ID)
-	if err != nil {
+	if err := row.Scan(&order.Username); err != nil {
 		return fmt.Errorf("cannot update status and accrual: %w", err)
 	}
 
-	err = updateWithRetry(ctx, tx, `UPDATE users SET balance = users.balance + $1`, order.Accrual)
+	err = updateWithRetry(ctx, tx, `UPDATE users SET balance = COALESCE(balance, 0) + $1 where login = $2`,
+		order.Accrual, order.Username)
 	if err != nil {
 		return fmt.Errorf("cannot update user's balance: %w", err)
 	}
-
+	if err = tx.Commit(ctx); err != nil {
+		return fmt.Errorf("cannot commit transaction: %w", err)
+	}
 	return nil
 }
 

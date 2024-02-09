@@ -26,25 +26,25 @@ services:
           cpus: '1'
           memory: 2G
 
-  gophermart:
-    container_name: gophermart
-    build:
-      dockerfile: build/Dockerfile
-    environment:
-      RUN_ADDRESS: "localhost:8080"
-      DATABASE_URI: "postgres://gopher:supersecretpass@postgres:5432/gophermart?sslmode=disable"
-      ACCRUAL_SYSTEM_ADDRESS: "accrual:8080"
-    restart: unless-stopped
-    platform: linux/amd64
-    ports:
-      - "8080:8080"
-    deploy:
-      resources:
-        limits:
-          cpus: '0.1'
-          memory: 200M
-    depends_on:
-      - postgres
+#  gophermart:
+#    container_name: gophermart
+#    build:
+#      dockerfile: build/Dockerfile
+#    environment:
+#      RUN_ADDRESS: "localhost:8080"
+#      DATABASE_URI: "postgres://gopher:supersecretpass@postgres:5432/gophermart?sslmode=disable"
+#      ACCRUAL_SYSTEM_ADDRESS: "accrual:8080"
+#    restart: unless-stopped
+#    platform: linux/amd64
+#    ports:
+#      - "8080:8080"
+#    deploy:
+#      resources:
+#        limits:
+#          cpus: '0.1'
+#          memory: 200M
+#    depends_on:
+#      - postgres
 
   accrual:
     container_name: accrual
