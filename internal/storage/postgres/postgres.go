@@ -261,7 +261,7 @@ func (db *DB) InsertWithdraw(ctx context.Context, w models.Withdraw, l zerolog.L
 		break
 	}
 	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("cannot commit transaction: %w", err)
+		return fmt.Errorf("cannot commit transaction in InsertWithdraw: %w", err)
 	}
 	return nil
 }
@@ -336,7 +336,7 @@ func (db *DB) ProcessOrderWithBonuses(ctx context.Context, order models.Order, l
 			return fmt.Errorf("cannot update status: %w", err)
 		}
 		if err = tx.Commit(ctx); err != nil {
-			return fmt.Errorf("cannot commit transaction: %w", err)
+			return fmt.Errorf("cannot commit transaction in ProcessOrderWithBonuses: %w", err)
 		}
 		return nil
 	}
@@ -354,7 +354,7 @@ func (db *DB) ProcessOrderWithBonuses(ctx context.Context, order models.Order, l
 		return fmt.Errorf("cannot update user's balance: %w", err)
 	}
 	if err = tx.Commit(ctx); err != nil {
-		return fmt.Errorf("cannot commit transaction: %w", err)
+		return fmt.Errorf("cannot commit transaction in ProcessOrderWithBonuses: %w", err)
 	}
 	return nil
 }
