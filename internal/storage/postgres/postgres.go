@@ -342,8 +342,9 @@ func (db *DB) ProcessOrderWithBonuses(ctx context.Context, order models.Order, l
 	}
 
 	row := tx.QueryRow(ctx,
-		`UPDATE orders SET status = $1, accrual = $2 where id = $3 RETURNING username;`,
-		order.Status, order.Accrual, order.ID)
+		`UPDATE orders SET status = $1, accrual = $2 where id = $3 and status != $4
+ 			RETURNING username;`,
+		order.Status, order.Accrual, order.ID, status.PROCESSED)
 	if err := row.Scan(&order.Username); err != nil {
 		return fmt.Errorf("cannot update status and accrual: %w", err)
 	}
