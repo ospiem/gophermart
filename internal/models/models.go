@@ -15,8 +15,14 @@ type Order struct {
 	Accrual   float32
 }
 
+type OrderResponse struct {
+	UploatedAt time.Time     `json:"uploated_at"`
+	Status     status.Status `json:"status"`
+	Number     string        `json:"number"`
+	Accrual    float32       `json:"accrual"`
+}
 type UserBalance struct {
-	Balance   float32 `json:"balance"`
+	Balance   float32 `json:"current"`
 	Withdrawn float32 `json:"withdrawn"`
 }
 

@@ -124,7 +124,7 @@ func (db *DB) SelectOrder(ctx context.Context, num string) (models.Order, error)
 	return order, nil
 }
 
-func (db *DB) SelectOrders(ctx context.Context, login string) ([]models.Order, error) {
+func (db *DB) SelectOrders(ctx context.Context, login string) ([]models.OrderResponse, error) {
 	rows, err := db.pool.Query(ctx,
 		`SELECT id, status, created_at, COALESCE(accrual, 0) AS accrual
 			 FROM orders WHERE username = $1 ORDER BY created_at DESC`, login)
@@ -133,10 +133,10 @@ func (db *DB) SelectOrders(ctx context.Context, login string) ([]models.Order, e
 	}
 
 	//TODO: paginate it.
-	orders := make([]models.Order, 0, rows.CommandTag().RowsAffected())
+	orders := make([]models.OrderResponse, 0, rows.CommandTag().RowsAffected())
 	for rows.Next() {
-		order := models.Order{}
-		if err := rows.Scan(&order.ID, &order.Status, &order.CreatedAt, &order.Accrual); err != nil {
+		order := models.OrderResponse{}
+		if err := rows.Scan(&order.Number, &order.Status, &order.UploatedAt, &order.Accrual); err != nil {
 			return nil, fmt.Errorf("cannot select the order: %w", err)
 		}
 		orders = append(orders, order)
@@ -202,7 +202,7 @@ func (db *DB) InsertWithdraw(ctx context.Context, w models.Withdraw, l zerolog.L
 	}
 	defer func() {
 		if err := tx.Rollback(ctx); err != nil {
-			l.Error().Err(err).Msg("cannot rollback tx")
+			l.Debug().Err(err).Msg("cannot rollback tx")
 		}
 	}()
 
@@ -326,7 +326,7 @@ func (db *DB) ProcessOrderWithBonuses(ctx context.Context, order models.Order, l
 	}
 	defer func() {
 		if err := tx.Rollback(ctx); err != nil {
-			logger.Error().Err(err).Msg("cannot rollback tx")
+			logger.Debug().Err(err).Msg("cannot rollback tx")
 		}
 	}()
 	if order.Status != status.PROCESSED {

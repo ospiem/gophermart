@@ -27,7 +27,7 @@ const authorization = "Authorization"
 const contentType = "Content-Type"
 const luhnAlgoDivisor = 10
 const invalidBody = "Invalid body"
-const tokenExp = time.Hour * 336
+const tokenExp = time.Hour * 2
 const invalitContentTypeNotJSON = "Invalid Content-Type, expected application/json"
 const evenDivisor = 2
 
