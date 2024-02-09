@@ -39,6 +39,7 @@ func New(cfg *config.Config, s Storage, l *zerolog.Logger) *RestClient {
 }
 
 func (r *RestClient) Run(ctx context.Context, wg *sync.WaitGroup) {
+	logger := r.Logger.With().Str("func", "Run").Logger()
 	mu := &sync.RWMutex{}
 	delayMap := make(map[string]int, 1)
 	orderCh := make(chan models.Order, r.Cfg.Pagination*r.Cfg.WorkersNum)
@@ -46,7 +47,7 @@ func (r *RestClient) Run(ctx context.Context, wg *sync.WaitGroup) {
 	for i := 0; i < r.Cfg.WorkersNum; i++ {
 		wg.Add(1)
 		go r.ProcessOrder(ctx, wg, mu, delayMap, orderCh)
-		r.Logger.Debug().Msgf("Started worker #%d", i+1)
+		logger.Debug().Msgf("Started worker #%d", i+1)
 	}
 
 	wg.Add(1)
@@ -57,7 +58,7 @@ func (r *RestClient) Run(ctx context.Context, wg *sync.WaitGroup) {
 		for {
 			select {
 			case <-ctx.Done():
-				r.Logger.Info().Msg("Stopped connection manager")
+				logger.Info().Msg("Stopped connection manager")
 				return
 
 			default:
@@ -77,7 +78,7 @@ func (r *RestClient) Run(ctx context.Context, wg *sync.WaitGroup) {
 				// Fetch orders from storage
 				orders, err := r.Storage.SelectOrdersToProceed(ctx, r.Cfg.Pagination, &offset)
 				if err != nil {
-					r.Logger.Err(err)
+					logger.Error().Err(err).Msg("")
 				}
 				// Send orders to orderCh
 				for _, o := range orders {
@@ -91,25 +92,26 @@ func (r *RestClient) Run(ctx context.Context, wg *sync.WaitGroup) {
 
 func (r *RestClient) ProcessOrder(ctx context.Context, wg *sync.WaitGroup, mu *sync.RWMutex,
 	delayMap map[string]int, jobs chan models.Order) {
+	logger := r.Logger.With().Str("func", "ProcessOrder").Logger()
 	defer wg.Done()
 
 	for {
 		select {
 		case <-ctx.Done():
-			r.Logger.Info().Msg("Stopped worker")
+			logger.Info().Msg("Stopped worker")
 			return
 
 		case order := <-jobs:
-			r.Logger.Debug().Msgf("got new order %s", order.ID)
+			logger.Debug().Msgf("got new order %s", order.ID)
 			updatedOrder, err := r.getOrderStatusFromService(ctx, order, mu, delayMap)
 			if err != nil {
 				if !errors.Is(err, ErrOrderNotRegister) && !errors.Is(err, ErrTooManyRequests) {
-					r.Logger.Err(err).Msg("cannot get order status from accrual")
+					logger.Error().Err(err).Msg("cannot get order status from accrual")
 					continue
 				}
 			}
 			if err := r.Storage.ProcessOrderWithBonuses(ctx, updatedOrder, r.Logger); err != nil {
-				r.Logger.Err(err)
+				logger.Error().Err(err).Msg("")
 			}
 		}
 	}
@@ -117,6 +119,7 @@ func (r *RestClient) ProcessOrder(ctx context.Context, wg *sync.WaitGroup, mu *s
 
 func (r *RestClient) getOrderStatusFromService(ctx context.Context, order models.Order, mu *sync.RWMutex,
 	delayMap map[string]int) (models.Order, error) {
+	logger := r.Logger.With().Str("func", "getOrderStatusFromService").Logger()
 	// Read from the map to check if the accrual service is available for establishing connections.
 	mu.RLock()
 	_ = delayMap[DelayTime]
@@ -133,12 +136,12 @@ func (r *RestClient) getOrderStatusFromService(ctx context.Context, order models
 
 	resp, err := client.Do(request)
 	if err != nil {
-		r.Logger.Err(err).Msg("cannot proceed request to accrual")
+		logger.Error().Err(err).Msg("cannot proceed request to accrual")
 	}
 	defer func() {
 		if resp != nil {
 			if err := resp.Body.Close(); err != nil {
-				r.Logger.Err(err).Msg("cannot close body")
+				logger.Error().Err(err).Msg("cannot close body")
 			}
 		}
 	}()
