@@ -18,7 +18,6 @@ import (
 )
 
 const retryAttempts = 3
-const connPGError = "cannot connect to postgres, will retry in"
 const defaultSleepInterval = 500
 
 type DB struct {
@@ -84,27 +83,24 @@ func runMigrations(dsn string) error {
 func (db *DB) InsertOrder(ctx context.Context, order models.Order, l zerolog.Logger) error {
 	logger := l.With().Str("DB method", "InsertOrder").Logger()
 
-	for attempt := 0; attempt < retryAttempts; attempt++ {
-		tag, err := db.pool.Exec(ctx,
-			`INSERT INTO orders (id, status, username) VALUES ($1, $2, $3)
+	tx, err := db.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("cannot start a transaction in InsertOrder: %w", err)
+	}
+	defer func() {
+		if err := tx.Rollback(ctx); err != nil {
+			logger.Debug().Err(err).Msg("cannot rollback tx in InsertOrder")
+		}
+	}()
+	err = updateWithRetry(ctx, tx, `INSERT INTO orders (id, status, username) VALUES ($1, $2, $3)
 				ON CONFLICT DO NOTHING`,
-			order.ID, order.Status, order.Username,
-		)
-		if err != nil {
-			if !isConnException(err) {
-				return fmt.Errorf("cannot insert order: %w", err)
-			}
-			var sleepTime time.Duration
-			sleepTime += defaultSleepInterval * time.Millisecond
-			logger.Error().Err(err).Msgf("%s %v", connPGError, sleepTime)
-			time.Sleep(sleepTime)
-			continue
-		}
-		rowsAffectedCount := tag.RowsAffected()
-		if rowsAffectedCount != 1 {
-			return fmt.Errorf("insertOrder expected 1 row to be affected, actually affected %d", rowsAffectedCount)
-		}
-		break
+		order.ID, order.Status, order.Username,
+	)
+	if err != nil {
+		return fmt.Errorf("cannot insert order: %w", err)
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return fmt.Errorf("cannot commit transaction in InsertOrder: %w", err)
 	}
 	return nil
 }
@@ -169,27 +165,25 @@ func (db *DB) SelectCreds(ctx context.Context, login string) (models.Credentials
 func (db *DB) InsertUser(ctx context.Context, login string, hash string, l zerolog.Logger) error {
 	logger := l.With().Str("func", "InsertUser").Logger()
 
-	for attempt := 0; attempt < retryAttempts; attempt++ {
-		tag, err := db.pool.Exec(ctx,
-			`INSERT INTO users (login, hash_password) VALUES ($1, $2)
+	tx, err := db.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("cannot start a transaction in InsertUser: %w", err)
+	}
+	defer func() {
+		if err := tx.Rollback(ctx); err != nil {
+			logger.Debug().Err(err).Msg("cannot rollback tx in InsertUser")
+		}
+	}()
+	err = updateWithRetry(ctx, tx,
+		`INSERT INTO users (login, hash_password) VALUES ($1, $2)
 				ON CONFLICT DO NOTHING`,
-			login, hash,
-		)
-		if err != nil {
-			if !isConnException(err) {
-				return fmt.Errorf("cannot insert order: %w", err)
-			}
-			var sleepTime time.Duration
-			sleepTime += defaultSleepInterval * time.Millisecond
-			logger.Error().Err(err).Msgf("%s %v", connPGError, sleepTime)
-			time.Sleep(sleepTime)
-			continue
-		}
-		rowsAffectedCount := tag.RowsAffected()
-		if rowsAffectedCount != 1 {
-			return fmt.Errorf("insertUser expected 1 row to be affected, actually affected %d", rowsAffectedCount)
-		}
-		break
+		login, hash,
+	)
+	if err != nil {
+		return fmt.Errorf("cannot insert user: %w", err)
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return fmt.Errorf("cannot commit transaction in InsertUser: %w", err)
 	}
 	return nil
 }
@@ -202,7 +196,7 @@ func (db *DB) InsertWithdraw(ctx context.Context, w models.Withdraw, l zerolog.L
 	}
 	defer func() {
 		if err := tx.Rollback(ctx); err != nil {
-			l.Debug().Err(err).Msg("cannot rollback tx")
+			logger.Debug().Err(err).Msg("cannot rollback tx")
 		}
 	}()
 
@@ -216,49 +210,21 @@ func (db *DB) InsertWithdraw(ctx context.Context, w models.Withdraw, l zerolog.L
 		return fmt.Errorf("cannot insert withdraw: %w", err)
 	}
 
-	for attempt := 0; attempt < retryAttempts; attempt++ {
-		tag, err := tx.Exec(ctx,
-			`UPDATE users SET balance = users.balance - $1, 
+	err = updateWithRetry(ctx, tx,
+		`UPDATE users SET balance = users.balance - $1, 
                  total_withdrawn = COALESCE(users.total_withdrawn, 0) + $1 WHERE login = $2;`,
-			w.Sum, w.User,
-		)
-		if err != nil {
-			if !isConnException(err) {
-				return fmt.Errorf("cannot update balance: %w", err)
-			}
-			var sleepTime time.Duration
-			sleepTime += defaultSleepInterval * time.Millisecond
-			logger.Error().Err(err).Msgf("%s %v", connPGError, sleepTime)
-			time.Sleep(sleepTime)
-			continue
-		}
-		rowsAffectedCount := tag.RowsAffected()
-		if rowsAffectedCount != 1 {
-			return fmt.Errorf("update balance expected 1 row to be affected, actually affected %d", rowsAffectedCount)
-		}
-		break
+		w.Sum, w.User,
+	)
+	if err != nil {
+		return fmt.Errorf("cannot update user's balance: %w", err)
 	}
 
-	for attempt := 0; attempt < retryAttempts; attempt++ {
-		tag, err := tx.Exec(ctx,
-			`UPDATE orders SET  withdraw = $1 WHERE id = $2;`,
-			wID, w.OrderNumber,
-		)
-		if err != nil {
-			if !isConnException(err) {
-				return fmt.Errorf("cannot insert withdraw: %w", err)
-			}
-			var sleepTime time.Duration
-			sleepTime += defaultSleepInterval * time.Millisecond
-			logger.Error().Err(err).Msgf("%s %v", connPGError, sleepTime)
-			time.Sleep(sleepTime)
-			continue
-		}
-		rowsAffectedCount := tag.RowsAffected()
-		if rowsAffectedCount != 1 {
-			return fmt.Errorf("insert withdraw expected 1 row to be affected, actually affected %d", rowsAffectedCount)
-		}
-		break
+	err = updateWithRetry(ctx, tx,
+		`UPDATE orders SET  withdraw = $1 WHERE id = $2;`,
+		wID, w.OrderNumber,
+	)
+	if err != nil {
+		return fmt.Errorf("cannot update user's order: %w", err)
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("cannot commit transaction in InsertWithdraw: %w", err)
