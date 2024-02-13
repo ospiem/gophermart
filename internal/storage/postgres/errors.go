@@ -9,7 +9,7 @@ import (
 
 var pgErr *pgconn.PgError
 
-func isConnExp(err error) bool {
+func isConnException(err error) bool {
 	if errors.As(err, &pgErr) {
 		return pgerrcode.IsConnectionException(pgErr.Code)
 	}
