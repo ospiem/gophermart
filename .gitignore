@@ -1,10 +1,3 @@
-# Binaries for programs and plugins
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
-
 # Test binary, built with `go test -c`
 *.test
 
@@ -13,7 +6,7 @@
 
 # Binaries
 cmd/gophermart/main
-cmd/gophermart/gophermart
+.tools/gophermart
 
 # Dependency directories (remove the comment below to include it)
 vendor/
@@ -21,3 +14,10 @@ vendor/
 # IDEs directories
 .idea
 .vscode
+
+golangci-lint/
+test.result
+pgDATA/
+.env
+.tools
+gophermart

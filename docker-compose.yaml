@@ -1,0 +1,65 @@
+version: "3.9"
+services:
+
+  postgres:
+    container_name: postgres
+    image: postgres:16.1-alpine3.19
+    environment:
+      POSTGRES_DB: "gophermart"
+      POSTGRES_USER: "gopher"
+      POSTGRES_PASSWORD: "supersecretpass"
+      PGDATA: "/var/lib/postgresql/data/pgdata"
+    volumes:
+      - ./pgDATA:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gopher -d gophermart"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+
+#  gophermart:
+#    container_name: gophermart
+#    build:
+#      dockerfile: build/Dockerfile
+#    environment:
+#      RUN_ADDRESS: "localhost:8080"
+#      DATABASE_URI: "postgres://gopher:supersecretpass@postgres:5432/gophermart?sslmode=disable"
+#      ACCRUAL_SYSTEM_ADDRESS: "accrual:8080"
+#    restart: unless-stopped
+#    platform: linux/amd64
+#    ports:
+#      - "8080:8080"
+#    deploy:
+#      resources:
+#        limits:
+#          cpus: '0.1'
+#          memory: 200M
+#    depends_on:
+#      - postgres
+
+  accrual:
+    container_name: accrual
+    build:
+      dockerfile: build/Dockerfile_accrual
+    environment:
+      DATABASE_URI: "postgres://gopher:supersecretpass@postgres:5432/gophermart?sslmode=disable"
+    ports:
+      - "8081:8080"
+    restart: unless-stopped
+    platform: linux/amd64
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 200M
+    depends_on:
+      - postgres
